@@ -1,130 +1,144 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
-import { colors, spacing, radius, type } from '../../theme';
-import { pollByGroup } from '../../data/mock';
+import { colors, spacing, radius, type, shadow } from '../../theme';
+import { useSession } from '../../state/session';
+import { useVotes } from '../../state/votes';
+import {
+  totalVotes,
+  statusLabel,
+  canCreateVote,
+  canSeeResults,
+  choiceOf,
+  countForOption,
+} from '../../state/voteRules';
+
+const STATUS_TONE = {
+  Live: { bg: colors.accentSoft, fg: colors.accent, icon: 'radio' },
+  Hidden: { bg: colors.primarySoft, fg: colors.primary, icon: 'eye-off' },
+  Closed: { bg: colors.surfaceAlt, fg: colors.inkSoft, icon: 'lock-closed' },
+};
 
 export default function VotesScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const seed = pollByGroup[groupId] || pollByGroup.g1;
+  const { user, roleInGroup } = useSession();
+  const { votesForGroup } = useVotes();
 
-  // Local, in-memory poll state — copied from the mock seed.
-  const [options, setOptions] = useState(() =>
-    seed.options.map((o) => ({ ...o }))
-  );
-  const [selected, setSelected] = useState(null);
-
-  const total = options.reduce((sum, o) => sum + o.votes, 0);
-
-  function vote(optionId) {
-    if (optionId === selected) return; // already your pick
-    setOptions((prev) =>
-      prev.map((o) => {
-        if (o.id === optionId) return { ...o, votes: o.votes + 1 };
-        if (o.id === selected) return { ...o, votes: Math.max(0, o.votes - 1) };
-        return o;
-      })
-    );
-    setSelected(optionId);
-  }
+  const role = roleInGroup(groupId);
+  const mayCreate = canCreateVote(role);
+  const votes = votesForGroup(groupId);
 
   return (
     <Screen>
-      <Header
-        title="Votes"
-        subtitle={groupName}
-        onBack={() => navigation.goBack()}
-      />
+      <Header title="Votes" subtitle={groupName} onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Card style={styles.poll}>
-          <View style={styles.pollHead}>
-            <View style={styles.liveTag}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE POLL</Text>
+        {/* Create action — only Captains/Admins ever see this. */}
+        {mayCreate ? (
+          <Pressable
+            onPress={() => navigation.navigate('NewVote', { groupId, groupName })}
+            style={({ pressed }) => [styles.newBtn, pressed && styles.pressed]}
+          >
+            <View style={styles.plusCircle}>
+              <Ionicons name="add" size={22} color={colors.onPrimary} />
             </View>
-            <Text style={styles.totalText}>
-              {total} {total === 1 ? 'vote' : 'votes'}
+            <View style={styles.newBtnBody}>
+              <Text style={styles.newBtnTitle}>New vote</Text>
+              <Text style={styles.newBtnSub}>You can create votes as {role}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          </Pressable>
+        ) : (
+          <View style={styles.memberNote}>
+            <Ionicons name="information-circle" size={16} color={colors.muted} />
+            <Text style={styles.memberNoteText}>
+              Only Captains and Admins can create votes.
             </Text>
           </View>
+        )}
 
-          <Text style={styles.question}>{seed.question}</Text>
-
-          <View style={styles.options}>
-            {options.map((o) => {
-              const pct = total === 0 ? 0 : Math.round((o.votes / total) * 100);
-              const isSelected = selected === o.id;
-              return (
-                <Pressable
-                  key={o.id}
-                  onPress={() => vote(o.id)}
-                  style={({ pressed }) => [
-                    styles.option,
-                    isSelected && styles.optionSelected,
-                    pressed && styles.optionPressed,
-                  ]}
-                >
-                  {/* Fill bar reflects live percentage */}
-                  <View
-                    style={[
-                      styles.fill,
-                      {
-                        width: `${pct}%`,
-                        backgroundColor: isSelected
-                          ? colors.primarySoft
-                          : colors.surfaceAlt,
-                      },
-                    ]}
-                  />
-                  <View style={styles.optionRow}>
-                    <View style={styles.optionLeft}>
-                      <View
-                        style={[
-                          styles.radio,
-                          isSelected && styles.radioOn,
-                        ]}
-                      >
-                        {isSelected ? (
-                          <Ionicons
-                            name="checkmark"
-                            size={13}
-                            color={colors.onPrimary}
-                          />
-                        ) : null}
-                      </View>
-                      <Text
-                        style={[
-                          styles.optionLabel,
-                          isSelected && styles.optionLabelOn,
-                        ]}
-                      >
-                        {o.label}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[styles.pct, isSelected && styles.pctOn]}
-                    >
-                      {pct}%
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.hint}>
-            {selected
-              ? 'Tap another option to change your vote'
-              : 'Tap an option to cast your vote'}
-          </Text>
-        </Card>
+        {votes.length === 0 ? (
+          <Card style={styles.empty}>
+            <Text style={styles.emptyTitle}>No votes yet</Text>
+            <Text style={styles.emptySub}>
+              {mayCreate
+                ? 'Create the first vote for this group.'
+                : 'Nothing to vote on right now.'}
+            </Text>
+          </Card>
+        ) : (
+          votes.map((vote) => (
+            <VoteListCard
+              key={vote.id}
+              vote={vote}
+              userId={user.id}
+              onPress={() =>
+                navigation.navigate('VoteDetail', { voteId: vote.id, groupName })
+              }
+            />
+          ))
+        )}
       </ScrollView>
     </Screen>
+  );
+}
+
+function VoteListCard({ vote, userId, onPress }) {
+  const label = statusLabel(vote);
+  const tone = STATUS_TONE[label];
+  const total = totalVotes(vote);
+  const showResults = canSeeResults(vote, userId);
+  const myChoice = choiceOf(vote, userId);
+
+  // Leading option, only computed when this user may see results.
+  let leading = null;
+  if (showResults && total > 0) {
+    leading = vote.options.reduce((best, o) =>
+      countForOption(vote, o.id) > countForOption(vote, best.id) ? o : best
+    );
+  }
+
+  return (
+    <Card onPress={onPress} style={styles.voteCard}>
+      <View style={styles.voteTop}>
+        <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+          <Ionicons name={tone.icon} size={11} color={tone.fg} />
+          <Text style={[styles.statusText, { color: tone.fg }]}>
+            {label.toUpperCase()}
+          </Text>
+        </View>
+        {myChoice ? (
+          <View style={styles.votedTag}>
+            <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+            <Text style={styles.votedText}>You voted</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={styles.question}>{vote.question}</Text>
+
+      <View style={styles.voteMeta}>
+        <Ionicons name="people-outline" size={14} color={colors.muted} />
+        <Text style={styles.metaText}>
+          {showResults
+            ? `${total} ${total === 1 ? 'vote' : 'votes'}`
+            : `${total} ${total === 1 ? 'person has' : 'people have'} voted`}
+        </Text>
+        {leading ? (
+          <>
+            <View style={styles.dot} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              Leading: {leading.label}
+            </Text>
+          </>
+        ) : null}
+      </View>
+    </Card>
   );
 }
 
@@ -133,115 +147,94 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  poll: {
-    padding: spacing.xl,
-  },
-  pollHead: {
+  newBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  liveTag: {
+  pressed: { opacity: 0.7 },
+  plusCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.card,
+  },
+  newBtnBody: { flex: 1, marginLeft: spacing.md },
+  newBtnTitle: { ...type.bodyStrong, color: colors.ink },
+  newBtnSub: { ...type.caption, color: colors.muted, marginTop: 1 },
+  memberNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-    marginRight: 6,
-  },
-  liveText: {
-    ...type.label,
-    fontSize: 10,
-    color: colors.accent,
-  },
-  totalText: {
+  memberNoteText: {
     ...type.caption,
-    color: colors.muted,
+    color: colors.inkSoft,
+    marginLeft: spacing.sm,
+    flex: 1,
   },
-  question: {
-    ...type.title,
-    fontSize: 20,
-    color: colors.ink,
-    marginBottom: spacing.xl,
+  empty: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
-  options: {
-    gap: spacing.md,
-  },
-  option: {
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  optionSelected: {
-    borderColor: colors.primary,
-  },
-  optionPressed: {
-    opacity: 0.85,
-  },
-  fill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: radius.sm,
-  },
-  optionRow: {
+  emptyTitle: { ...type.heading, color: colors.ink },
+  emptySub: { ...type.caption, color: colors.muted, marginTop: 4 },
+  voteCard: { marginBottom: spacing.md },
+  voteTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
   },
-  optionLeft: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
   },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-    backgroundColor: colors.surface,
+  statusText: {
+    ...type.label,
+    fontSize: 10,
+    marginLeft: 4,
   },
-  radioOn: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  votedTag: { flexDirection: 'row', alignItems: 'center' },
+  votedText: {
+    ...type.caption,
+    color: colors.success,
+    fontWeight: '600',
+    marginLeft: 4,
   },
-  optionLabel: {
-    ...type.body,
-    color: colors.inkSoft,
-  },
-  optionLabelOn: {
-    ...type.bodyStrong,
+  question: {
+    ...type.heading,
+    fontSize: 18,
     color: colors.ink,
+    marginBottom: spacing.md,
   },
-  pct: {
-    ...type.bodyStrong,
-    color: colors.muted,
-  },
-  pctOn: {
-    color: colors.primary,
-  },
-  hint: {
+  voteMeta: { flexDirection: 'row', alignItems: 'center' },
+  metaText: {
     ...type.caption,
     color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
+    marginLeft: 5,
+    flexShrink: 1,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.muted,
+    marginHorizontal: spacing.sm,
   },
 });

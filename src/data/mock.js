@@ -3,9 +3,18 @@
 // any interaction (e.g. poll votes) in local component state.
 
 export const currentUser = {
+  id: 'u_jordan',
   name: 'Jordan Lee',
   handle: '@jordan',
   role: 'Student · Lincoln High',
+  // Permission role per group. Hardcoded for now — the single source of truth
+  // for "what may this user do here", ready to be replaced by real auth.
+  // Captain of the soccer team, plain Member of robotics, Admin of the study group.
+  rolesByGroup: {
+    g1: 'Captain',
+    g2: 'Member',
+    g3: 'Admin',
+  },
   stats: {
     groups: 3,
     votesCast: 27,
@@ -99,33 +108,9 @@ export const feedByGroup = {
   ],
 };
 
-// Poll seed keyed by group id — screens copy this into local state.
-export const pollByGroup = {
-  g1: {
-    question: 'What time works best for Saturday practice?',
-    options: [
-      { id: 'o1', label: '9:00 AM', votes: 8 },
-      { id: 'o2', label: '11:00 AM', votes: 5 },
-      { id: 'o3', label: '2:00 PM', votes: 3 },
-    ],
-  },
-  g2: {
-    question: 'Which project should we prioritize next sprint?',
-    options: [
-      { id: 'o1', label: 'Autonomous nav', votes: 6 },
-      { id: 'o2', label: 'Arm redesign', votes: 7 },
-      { id: 'o3', label: 'Vision system', votes: 2 },
-    ],
-  },
-  g3: {
-    question: 'When should we hold the exam review?',
-    options: [
-      { id: 'o1', label: 'Thu after school', votes: 5 },
-      { id: 'o2', label: 'Sat morning', votes: 3 },
-      { id: 'o3', label: 'Sun evening', votes: 1 },
-    ],
-  },
-};
+// Note: live vote/poll data now lives in src/data/votesSeed.js and is managed
+// through the VotesProvider (src/state/votes.js), since votes are created and
+// mutated at runtime rather than being static content.
 
 // Members keyed by group id.
 export const membersByGroup = {

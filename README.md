@@ -43,8 +43,20 @@ Bottom tab navigation with four tabs, plus a group detail flow.
 Tapping a group opens its detail screen, which routes into four modules:
 
 - **Feed** — mock posts with type tag, author, text, and time.
-- **Votes** — an **interactive** poll: tap an option to cast/change your vote and
-  watch counts and percentages update live (in-memory only).
+- **Votes** — a **role-based** voting system (in-memory):
+  - Each user has a permission role per group (Admin / Captain / Member),
+    resolved through a swappable session layer (`src/state/session.js`).
+  - **Captains and Admins** can create votes (question, 2–5 options, and a
+    live-vs-hidden results toggle); the create action is hidden from Members.
+  - Every member casts **one changeable vote**; ballots are **named**, so each
+    voter's name shows under the option they picked.
+  - **Live** votes reveal counts and names as they come in; **hidden** votes
+    show only "X people have voted" to members until the creator closes them
+    (the creator can preview their own hidden vote).
+  - Only the **creator** can close a vote; once closed, named results are
+    visible to everyone and no further votes can be cast.
+
+  Rules live in `src/state/voteRules.js`; vote state in `src/state/votes.js`.
 - **Members** — static roster of names and roles.
 - **Attendance** — a visually distinct *coming soon* card; reserved space, no
   functionality yet.
@@ -64,11 +76,19 @@ src/
     GroupDetailScreen.js
     modules/
       FeedScreen.js
-      VotesScreen.js
+      VotesScreen.js        List of a group's votes + gated "New vote"
+      VoteDetailScreen.js   Named results, live/hidden logic, close action
+      NewVoteScreen.js      Create-vote form (Captain/Admin only)
       MembersScreen.js
       AttendanceScreen.js
   components/               Reusable UI (Card, Avatar, Badge, Header, …)
-  data/mock.js             All placeholder content
+  state/
+    session.js             Current user + per-group role (swappable for auth)
+    votes.js               In-memory VotesProvider (create/cast/close)
+    voteRules.js           Pure tally + permission + visibility rules
+  data/
+    mock.js                Groups, members, feed, alerts, current user
+    votesSeed.js           Seed votes with named ballots
   theme/                   Color palette, typography, spacing tokens
 ```
 
