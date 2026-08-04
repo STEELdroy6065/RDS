@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Synq",
+    "slug": "synq",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "synq",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F5F4F8",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#5646C4"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#5646C4"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
