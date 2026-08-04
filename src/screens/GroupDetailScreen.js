@@ -82,6 +82,17 @@ export default function GroupDetailScreen({ route, navigation }) {
           </View>
         </View>
 
+        {/* Invite code — share so others can join this group */}
+        <View style={styles.codeCard}>
+          <View style={styles.codeLeft}>
+            <Ionicons name="key-outline" size={16} color={colors.primary} />
+            <Text style={styles.codeLabel}>Group code</Text>
+          </View>
+          <Text style={styles.codeValue} selectable numberOfLines={1}>
+            {group.id}
+          </Text>
+        </View>
+
         {/* Module grid */}
         <View style={styles.grid}>
           {MODULES.map((m) => (
@@ -159,6 +170,30 @@ const styles = StyleSheet.create({
   meta: {
     ...type.caption,
     color: colors.muted,
+  },
+  codeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  codeLeft: { flexDirection: 'row', alignItems: 'center' },
+  codeLabel: {
+    ...type.label,
+    color: colors.muted,
+    marginLeft: 6,
+  },
+  codeValue: {
+    ...type.caption,
+    color: colors.inkSoft,
+    flexShrink: 1,
+    marginLeft: spacing.md,
   },
   grid: {
     flexDirection: 'row',

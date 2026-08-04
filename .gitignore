@@ -26,7 +26,8 @@ yarn-error.*
 # macOS
 .DS_Store
 
-# Env
+# Env — keep real secrets out of git; .env.example is committed as a template.
+.env
 .env*.local
 
 # Editors

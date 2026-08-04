@@ -8,7 +8,7 @@ import { colors, spacing, radius, type, shadow } from '../theme';
 import { useGroups } from '../state/groups';
 
 export default function GroupsScreen({ navigation }) {
-  const { groups } = useGroups();
+  const { groups, loading } = useGroups();
   return (
     <Screen>
       <ScrollView
@@ -37,13 +37,26 @@ export default function GroupsScreen({ navigation }) {
           All groups
         </SectionLabel>
 
-        {groups.map((g) => (
-          <GroupCard
-            key={g.id}
-            group={g}
-            onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
-          />
-        ))}
+        {groups.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>
+              {loading ? 'Loading your groups…' : 'No groups yet'}
+            </Text>
+            {!loading ? (
+              <Text style={styles.emptySub}>
+                Tap “New group” above to create one, or join with a code.
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          groups.map((g) => (
+            <GroupCard
+              key={g.id}
+              group={g}
+              onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
+            />
+          ))
+        )}
       </ScrollView>
     </Screen>
   );
@@ -102,5 +115,20 @@ const styles = StyleSheet.create({
   count: {
     ...type.caption,
     color: colors.muted,
+  },
+  empty: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyTitle: { ...type.heading, color: colors.ink },
+  emptySub: {
+    ...type.caption,
+    color: colors.muted,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

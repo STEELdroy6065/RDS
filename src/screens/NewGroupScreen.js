@@ -5,25 +5,23 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
-import Card from '../components/Card';
-import Avatar from '../components/Avatar';
 import Header from '../components/Header';
 import { colors, spacing, radius, type, shadow } from '../theme';
 import { useGroups } from '../state/groups';
-import { discoverableGroups, groupTemplates } from '../data/discoverable';
+import { groupTemplates } from '../data/discoverable';
 
 export default function NewGroupScreen({ navigation }) {
   const [tab, setTab] = useState('create'); // 'create' | 'join'
 
   // Replace this screen so Back returns to the Groups list, not the form.
-  const openGroup = (groupId) =>
-    navigation.replace('GroupDetail', { groupId });
+  const openGroup = (groupId) => navigation.replace('GroupDetail', { groupId });
 
   return (
     <Screen>
@@ -45,13 +43,8 @@ export default function NewGroupScreen({ navigation }) {
 
 function Segment({ label, active, onPress }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.segment, active && styles.segmentActive]}
-    >
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-        {label}
-      </Text>
+    <Pressable onPress={onPress} style={[styles.segment, active && styles.segmentActive]}>
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -62,13 +55,22 @@ function CreateTab({ onCreated }) {
   const { createGroup } = useGroups();
   const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState('class');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const isValid = name.trim().length > 0;
+  const isValid = name.trim().length > 0 && !busy;
 
-  function submit() {
+  async function submit() {
     if (!isValid) return;
-    const id = createGroup({ name, templateId });
-    onCreated(id);
+    setBusy(true);
+    setError('');
+    try {
+      const id = await createGroup({ name, templateId });
+      onCreated(id);
+    } catch (e) {
+      setError((e && e.message) || 'Could not create the group. Please try again.');
+      setBusy(false);
+    }
   }
 
   return (
@@ -89,6 +91,7 @@ function CreateTab({ onCreated }) {
           placeholderTextColor={colors.muted}
           style={styles.input}
           autoCapitalize="words"
+          editable={!busy}
         />
 
         <Text style={[styles.label, styles.spacedLabel]}>Template</Text>
@@ -102,9 +105,7 @@ function CreateTab({ onCreated }) {
                 style={[styles.template, active && styles.templateActive]}
               >
                 <Text style={styles.templateEmoji}>{t.emoji}</Text>
-                <Text
-                  style={[styles.templateLabel, active && styles.templateLabelActive]}
-                >
+                <Text style={[styles.templateLabel, active && styles.templateLabelActive]}>
                   {t.label}
                 </Text>
                 {active ? (
@@ -123,6 +124,8 @@ function CreateTab({ onCreated }) {
             You'll be the Admin of this group, starting with 1 member.
           </Text>
         </View>
+
+        {error ? <ErrorNote text={error} /> : null}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -135,9 +138,13 @@ function CreateTab({ onCreated }) {
             pressed && isValid && styles.pressed,
           ]}
         >
-          <Text style={[styles.ctaText, !isValid && styles.ctaTextDisabled]}>
-            Create group
-          </Text>
+          {busy ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <Text style={[styles.ctaText, !isValid && styles.ctaTextDisabled]}>
+              Create group
+            </Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -147,74 +154,98 @@ function CreateTab({ onCreated }) {
 // --- Join ---------------------------------------------------------------
 
 function JoinTab({ onJoined }) {
-  const { joinGroup, joinByCode } = useGroups();
+  const { joinByCode } = useGroups();
   const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const codeValid = code.trim().length > 0;
+  const codeValid = code.trim().length > 0 && !busy;
+
+  async function join() {
+    if (!codeValid) return;
+    setBusy(true);
+    setError('');
+    try {
+      const id = await joinByCode(code);
+      onJoined(id);
+    } catch (e) {
+      setError(friendlyJoinError(e && e.message));
+      setBusy(false);
+    }
+  }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.label}>Group code</Text>
-      <View style={styles.codeRow}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.label}>Group code</Text>
         <TextInput
           value={code}
           onChangeText={setCode}
-          placeholder="Enter a code"
+          placeholder="Paste a group code"
           placeholderTextColor={colors.muted}
-          style={[styles.input, styles.codeInput]}
-          autoCapitalize="characters"
+          style={styles.input}
+          autoCapitalize="none"
           autoCorrect={false}
+          editable={!busy}
         />
+
+        <View style={styles.joinHint}>
+          <Ionicons name="information-circle" size={16} color={colors.muted} />
+          <Text style={styles.joinHintText}>
+            Ask a group's Admin for its code — you'll find it on the group's
+            page. Joining adds you as a Member.
+          </Text>
+        </View>
+
+        {error ? <ErrorNote text={error} /> : null}
+      </ScrollView>
+
+      <View style={styles.footer}>
         <Pressable
-          onPress={() => codeValid && onJoined(joinByCode(code))}
+          onPress={join}
           disabled={!codeValid}
           style={({ pressed }) => [
-            styles.codeBtn,
-            !codeValid && styles.codeBtnDisabled,
+            styles.cta,
+            !codeValid && styles.ctaDisabled,
             pressed && codeValid && styles.pressed,
           ]}
         >
-          <Text style={[styles.codeBtnText, !codeValid && styles.ctaTextDisabled]}>
-            Join
-          </Text>
+          {busy ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <Text style={[styles.ctaText, !codeValid && styles.ctaTextDisabled]}>
+              Join group
+            </Text>
+          )}
         </Pressable>
       </View>
+    </KeyboardAvoidingView>
+  );
+}
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or discover</Text>
-        <View style={styles.dividerLine} />
-      </View>
+function friendlyJoinError(message = '') {
+  if (/duplicate|unique/i.test(message))
+    return 'You are already a member of that group.';
+  if (/invalid input syntax|uuid/i.test(message))
+    return 'That does not look like a valid group code.';
+  if (/violates foreign key|not present/i.test(message))
+    return 'No group found for that code.';
+  return message || 'Could not join. Please check the code and try again.';
+}
 
-      {discoverableGroups.map((g) => (
-        <Card key={g.key} style={styles.discCard}>
-          <View style={styles.discRow}>
-            <Avatar emoji={g.emoji} name={g.name} size={46} />
-            <View style={styles.discBody}>
-              <Text style={styles.discName} numberOfLines={1}>
-                {g.name}
-              </Text>
-              <Text style={styles.discBlurb} numberOfLines={1}>
-                {g.blurb}
-              </Text>
-              <Text style={styles.discMeta}>
-                {g.kind} · {g.members} members
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => onJoined(joinGroup(g))}
-              style={({ pressed }) => [styles.joinBtn, pressed && styles.pressed]}
-            >
-              <Text style={styles.joinBtnText}>Join</Text>
-            </Pressable>
-          </View>
-        </Card>
-      ))}
-    </ScrollView>
+function ErrorNote({ text }) {
+  return (
+    <View style={styles.errorNote}>
+      <Ionicons name="alert-circle" size={16} color={colors.accent} />
+      <Text style={styles.errorText}>{text}</Text>
+    </View>
   );
 }
 
@@ -306,43 +337,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  codeRow: { flexDirection: 'row', gap: spacing.md },
-  codeInput: { flex: 1 },
-  codeBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+  joinHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
   },
-  codeBtnDisabled: { backgroundColor: colors.surfaceAlt },
-  codeBtnText: { ...type.bodyStrong, color: colors.onPrimary },
+  joinHintText: {
+    ...type.caption,
+    color: colors.inkSoft,
+    marginLeft: spacing.sm,
+    flex: 1,
+    lineHeight: 18,
+  },
 
-  divider: {
+  errorNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.lg,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
-  dividerText: {
-    ...type.label,
-    color: colors.muted,
-    marginHorizontal: spacing.md,
+  errorText: {
+    ...type.caption,
+    color: colors.accent,
+    marginLeft: spacing.sm,
+    flex: 1,
+    lineHeight: 18,
   },
-
-  discCard: { marginBottom: spacing.md },
-  discRow: { flexDirection: 'row', alignItems: 'center' },
-  discBody: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
-  discName: { ...type.bodyStrong, color: colors.ink },
-  discBlurb: { ...type.caption, color: colors.inkSoft, marginTop: 1 },
-  discMeta: { ...type.caption, color: colors.muted, marginTop: 3 },
-  joinBtn: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-  },
-  joinBtnText: { ...type.bodyStrong, color: colors.primary },
 
   footer: {
     paddingHorizontal: spacing.lg,
@@ -357,6 +382,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.lg,
     alignItems: 'center',
+    minHeight: 54,
+    justifyContent: 'center',
   },
   ctaDisabled: { backgroundColor: colors.surfaceAlt },
   ctaText: { ...type.bodyStrong, color: colors.onPrimary },

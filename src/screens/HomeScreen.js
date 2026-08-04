@@ -37,13 +37,22 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         <SectionLabel style={styles.section}>Your groups</SectionLabel>
-        {groups.map((g) => (
-          <GroupCard
-            key={g.id}
-            group={g}
-            onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
-          />
-        ))}
+        {groups.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No groups yet</Text>
+            <Text style={styles.emptySub}>
+              Head to the Groups tab to create or join your first group.
+            </Text>
+          </View>
+        ) : (
+          groups.map((g) => (
+            <GroupCard
+              key={g.id}
+              group={g}
+              onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
+            />
+          ))
+        )}
       </ScrollView>
     </Screen>
   );
@@ -110,5 +119,20 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: spacing.xs,
+  },
+  empty: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  emptyTitle: { ...type.heading, color: colors.ink },
+  emptySub: {
+    ...type.caption,
+    color: colors.muted,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -11,21 +12,75 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import { colors, spacing, radius, type } from '../../theme';
+import { useSession } from '../../state/session';
 
-// Mock auth: UI only. "Continue" always drops into the app on the existing
-// mock data — no accounts, no validation, no persistence yet. The Log in /
-// Sign up toggle is purely visual and doesn't branch.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 6;
+
+// Turn Supabase auth errors into clear, user-facing messages.
+function friendlyError(message = '') {
+  if (/already registered|already exists/i.test(message))
+    return 'That email is already registered — try logging in instead.';
+  if (/invalid login credentials/i.test(message))
+    return 'Wrong email or password.';
+  if (/email not confirmed/i.test(message))
+    return 'Please confirm your email first, then log in.';
+  if (/rate limit|too many/i.test(message))
+    return 'Too many attempts. Please wait a moment and try again.';
+  return message || 'Something went wrong. Please try again.';
+}
+
 export default function AuthScreen({ navigation }) {
+  const { signUp, signIn } = useSession();
   const [mode, setMode] = useState('signup'); // 'signup' | 'login'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const isLogin = mode === 'login';
 
-  const enterApp = () => {
-    // Reset so Back can't return to onboarding.
-    navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-  };
+  const emailOk = EMAIL_RE.test(email.trim());
+  const passwordOk = password.length >= MIN_PASSWORD;
+  const nameOk = isLogin || name.trim().length > 0;
+  const canSubmit = emailOk && passwordOk && nameOk && !loading;
+
+  function switchMode() {
+    setMode(isLogin ? 'signup' : 'login');
+    setError('');
+    setInfo('');
+  }
+
+  async function submit() {
+    if (!canSubmit) return;
+    setLoading(true);
+    setError('');
+    setInfo('');
+
+    try {
+      if (isLogin) {
+        const { error: err } = await signIn({ email, password });
+        if (err) setError(friendlyError(err.message));
+        // On success, the auth listener swaps the navigator into the app.
+      } else {
+        const { data, error: err } = await signUp({ name, email, password });
+        if (err) {
+          setError(friendlyError(err.message));
+        } else if (!data.session) {
+          // Email confirmation is enabled on the project.
+          setInfo('Account created! Check your email to confirm, then log in.');
+          setMode('login');
+          setPassword('');
+        }
+      }
+    } catch (e) {
+      setError(friendlyError(e && e.message));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <Screen>
@@ -57,15 +112,16 @@ export default function AuthScreen({ navigation }) {
           </Text>
 
           <View style={styles.form}>
-            {/* Name — shown for sign up; the toggle is visual only so we keep
-                the field mounted and simply de-emphasize it on login. */}
-            <Field
-              icon="person-outline"
-              placeholder="Full name"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
+            {!isLogin ? (
+              <Field
+                icon="person-outline"
+                placeholder="Full name"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                editable={!loading}
+              />
+            ) : null}
             <Field
               icon="mail-outline"
               placeholder="Email address"
@@ -73,30 +129,67 @@ export default function AuthScreen({ navigation }) {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+            <Field
+              icon="lock-closed-outline"
+              placeholder={`Password (min ${MIN_PASSWORD} characters)`}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!loading}
             />
           </View>
 
-          <Pressable
-            onPress={enterApp}
-            style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
-          >
-            <Text style={styles.ctaText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.onPrimary} />
-          </Pressable>
+          {error ? (
+            <View style={styles.banner}>
+              <Ionicons name="alert-circle" size={16} color={colors.accent} />
+              <Text style={styles.bannerText}>{error}</Text>
+            </View>
+          ) : null}
+          {info ? (
+            <View style={[styles.banner, styles.bannerInfo]}>
+              <Ionicons name="mail-unread" size={16} color={colors.primary} />
+              <Text style={[styles.bannerText, styles.bannerTextInfo]}>{info}</Text>
+            </View>
+          ) : null}
 
-          <Text style={styles.disclaimer}>
-            Demo only — no account is created and nothing is saved.
-          </Text>
+          <Pressable
+            onPress={submit}
+            disabled={!canSubmit}
+            style={({ pressed }) => [
+              styles.cta,
+              !canSubmit && styles.ctaDisabled,
+              pressed && canSubmit && styles.pressed,
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <>
+                <Text
+                  style={[styles.ctaText, !canSubmit && styles.ctaTextDisabled]}
+                >
+                  {isLogin ? 'Log in' : 'Create account'}
+                </Text>
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color={canSubmit ? colors.onPrimary : colors.muted}
+                />
+              </>
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.togglePrompt}>
             {isLogin ? 'New to Synq?' : 'Already have an account?'}
           </Text>
-          <Pressable onPress={() => setMode(isLogin ? 'signup' : 'login')} hitSlop={8}>
-            <Text style={styles.toggleLink}>
-              {isLogin ? 'Sign up' : 'Log in'}
-            </Text>
+          <Pressable onPress={switchMode} hitSlop={8} disabled={loading}>
+            <Text style={styles.toggleLink}>{isLogin ? 'Sign up' : 'Log in'}</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -176,6 +269,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     marginLeft: spacing.md,
   },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  bannerInfo: { backgroundColor: colors.primarySoft },
+  bannerText: { ...type.caption, color: colors.accent, flex: 1, lineHeight: 18 },
+  bannerTextInfo: { color: colors.primaryDark },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -185,19 +290,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     marginTop: spacing.xl,
     gap: spacing.sm,
+    minHeight: 54,
   },
+  ctaDisabled: { backgroundColor: colors.surfaceAlt },
   pressed: { opacity: 0.85 },
   ctaText: {
     ...type.bodyStrong,
     fontSize: 16,
     color: colors.onPrimary,
   },
-  disclaimer: {
-    ...type.caption,
-    color: colors.muted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
+  ctaTextDisabled: { color: colors.muted },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

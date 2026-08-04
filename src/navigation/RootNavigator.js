@@ -22,6 +22,7 @@ import AttendanceScreen from '../screens/modules/AttendanceScreen';
 import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 
 import { colors, type } from '../theme';
+import { useSession } from '../state/session';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -85,27 +86,34 @@ function Tabs() {
 }
 
 export default function RootNavigator() {
+  const { session, initializing } = useSession();
+
+  // Hold on the branded splash until the persisted session is restored.
+  if (initializing) return <SplashScreen />;
+
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{ headerShown: false }}
-      >
-        {/* Onboarding flow — the app opens here before the main tabs. */}
-        <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Auth" component={AuthScreen} />
-
-        <Stack.Screen name="Tabs" component={Tabs} />
-        <Stack.Screen name="NewGroup" component={NewGroupScreen} />
-        <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
-        <Stack.Screen name="Feed" component={FeedScreen} />
-        <Stack.Screen name="Votes" component={VotesScreen} />
-        <Stack.Screen name="VoteDetail" component={VoteDetailScreen} />
-        <Stack.Screen name="NewVote" component={NewVoteScreen} />
-        <Stack.Screen name="Members" component={MembersScreen} />
-        <Stack.Screen name="Attendance" component={AttendanceScreen} />
-        <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {session ? (
+          <>
+            <Stack.Screen name="Tabs" component={Tabs} />
+            <Stack.Screen name="NewGroup" component={NewGroupScreen} />
+            <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+            <Stack.Screen name="Feed" component={FeedScreen} />
+            <Stack.Screen name="Votes" component={VotesScreen} />
+            <Stack.Screen name="VoteDetail" component={VoteDetailScreen} />
+            <Stack.Screen name="NewVote" component={NewVoteScreen} />
+            <Stack.Screen name="Members" component={MembersScreen} />
+            <Stack.Screen name="Attendance" component={AttendanceScreen} />
+            <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
+          </>
+        ) : (
+          <>
+            {/* Unauthenticated onboarding flow. */}
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Auth" component={AuthScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
 import Card from '../components/Card';
@@ -7,6 +7,8 @@ import Avatar from '../components/Avatar';
 import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, radius, type } from '../theme';
 import { currentUser } from '../data/mock';
+import { useSession } from '../state/session';
+import { useGroups } from '../state/groups';
 
 const SETTINGS = [
   { id: 's1', icon: 'notifications-outline', label: 'Notifications' },
@@ -17,7 +19,19 @@ const SETTINGS = [
 ];
 
 export default function ProfileScreen() {
-  const { name, role, stats } = currentUser;
+  const { user, signOut } = useSession();
+  const { groups } = useGroups();
+  const stats = currentUser.stats; // votes/attendance stats stay mock for now
+
+  const name = user ? user.name : 'Member';
+  const subtitle = user ? user.email : '';
+
+  function confirmSignOut() {
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: () => signOut() },
+    ]);
+  }
 
   return (
     <Screen>
@@ -32,12 +46,12 @@ export default function ProfileScreen() {
             <Avatar name={name} size={64} />
             <View style={styles.profileInfo}>
               <Text style={styles.name}>{name}</Text>
-              <Text style={styles.role}>{role}</Text>
+              {subtitle ? <Text style={styles.role}>{subtitle}</Text> : null}
             </View>
           </View>
 
           <View style={styles.statsRow}>
-            <Stat value={stats.groups} label="Groups" />
+            <Stat value={groups.length} label="Groups" />
             <View style={styles.vDivider} />
             <Stat value={stats.votesCast} label="Votes cast" />
             <View style={styles.vDivider} />
@@ -50,6 +64,7 @@ export default function ProfileScreen() {
           {SETTINGS.map((s, i) => (
             <Pressable
               key={s.id}
+              onPress={s.id === 's5' ? confirmSignOut : undefined}
               style={({ pressed }) => [
                 styles.settingRow,
                 i < SETTINGS.length - 1 && styles.settingBorder,
@@ -71,7 +86,7 @@ export default function ProfileScreen() {
           ))}
         </Card>
 
-        <Text style={styles.version}>Synq · v0.1.0 (skeleton)</Text>
+        <Text style={styles.version}>Synq · v0.1.0</Text>
       </ScrollView>
     </Screen>
   );
