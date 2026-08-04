@@ -4,7 +4,8 @@ import Screen from '../components/Screen';
 import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, type } from '../theme';
-import { currentUser, groups } from '../data/mock';
+import { currentUser } from '../data/mock';
+import { useGroups } from '../state/groups';
 
 function greeting() {
   const h = new Date().getHours();
@@ -15,6 +16,7 @@ function greeting() {
 
 export default function HomeScreen({ navigation }) {
   const firstName = currentUser.name.split(' ')[0];
+  const { groups } = useGroups();
 
   return (
     <Screen>
@@ -27,7 +29,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.name}>{firstName} 👋</Text>
 
         <View style={styles.summaryRow}>
-          <Summary value={currentUser.stats.groups} label="Groups" />
+          <Summary value={groups.length} label="Groups" />
           <View style={styles.vDivider} />
           <Summary value={currentUser.stats.votesCast} label="Votes cast" />
           <View style={styles.vDivider} />

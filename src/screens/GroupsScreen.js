@@ -5,9 +5,10 @@ import Screen from '../components/Screen';
 import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, radius, type, shadow } from '../theme';
-import { groups } from '../data/mock';
+import { useGroups } from '../state/groups';
 
 export default function GroupsScreen({ navigation }) {
+  const { groups } = useGroups();
   return (
     <Screen>
       <ScrollView
@@ -16,8 +17,8 @@ export default function GroupsScreen({ navigation }) {
       >
         <Text style={styles.title}>Groups</Text>
 
-        {/* Visual-only stub — non-functional at skeleton stage. */}
         <Pressable
+          onPress={() => navigation.navigate('NewGroup')}
           style={({ pressed }) => [styles.newBtn, pressed && styles.pressed]}
         >
           <View style={styles.plusCircle}>
@@ -26,7 +27,7 @@ export default function GroupsScreen({ navigation }) {
           <View style={styles.newBtnBody}>
             <Text style={styles.newBtnTitle}>New group</Text>
             <Text style={styles.newBtnSub}>
-              Start a team, club, or class
+              Create or join a team, club, or class
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />

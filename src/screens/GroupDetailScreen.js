@@ -6,7 +6,7 @@ import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Header from '../components/Header';
 import { colors, spacing, radius, type, shadow } from '../theme';
-import { groups } from '../data/mock';
+import { useGroups } from '../state/groups';
 
 const MODULES = [
   {
@@ -46,7 +46,19 @@ const MODULES = [
 
 export default function GroupDetailScreen({ route, navigation }) {
   const { groupId } = route.params;
-  const group = groups.find((g) => g.id === groupId) || groups[0];
+  const { getGroup } = useGroups();
+  const group = getGroup(groupId);
+
+  if (!group) {
+    return (
+      <Screen>
+        <Header title="Group" onBack={() => navigation.goBack()} />
+        <View style={styles.groupHead}>
+          <Text style={styles.meta}>This group is no longer available.</Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -63,11 +75,7 @@ export default function GroupDetailScreen({ route, navigation }) {
           <View style={styles.metaRow}>
             <Badge
               label={group.role}
-              tone={
-                group.role === 'Captain' || group.role === 'Organizer'
-                  ? 'primary'
-                  : 'neutral'
-              }
+              tone={group.role === 'Member' ? 'neutral' : 'primary'}
             />
             <Badge label={group.kind} tone="neutral" style={{ marginLeft: 8 }} />
             <View style={styles.dot} />

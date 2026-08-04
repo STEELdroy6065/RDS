@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/state/session';
+import { GroupsProvider } from './src/state/groups';
 import { VotesProvider } from './src/state/votes';
 
 export default function App() {
@@ -10,9 +11,11 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <SessionProvider>
-        <VotesProvider>
-          <RootNavigator />
-        </VotesProvider>
+        <GroupsProvider>
+          <VotesProvider>
+            <RootNavigator />
+          </VotesProvider>
+        </GroupsProvider>
       </SessionProvider>
     </SafeAreaProvider>
   );

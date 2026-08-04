@@ -14,6 +14,7 @@ import Screen from '../../components/Screen';
 import Header from '../../components/Header';
 import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
+import { useGroups } from '../../state/groups';
 import { useVotes } from '../../state/votes';
 import { canCreateVote } from '../../state/voteRules';
 
@@ -22,7 +23,8 @@ const MAX_OPTIONS = 5;
 
 export default function NewVoteScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const { user, roleInGroup } = useSession();
+  const { user } = useSession();
+  const { roleForGroup } = useGroups();
   const { createVote } = useVotes();
 
   const [question, setQuestion] = useState('');
@@ -30,7 +32,7 @@ export default function NewVoteScreen({ route, navigation }) {
   const [visibility, setVisibility] = useState('live'); // 'live' | 'hidden'
 
   // Defensive guard: this screen should be unreachable for Members.
-  const role = roleInGroup(groupId);
+  const role = roleForGroup(groupId);
   if (!canCreateVote(role)) {
     return (
       <Screen>

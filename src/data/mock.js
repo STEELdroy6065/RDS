@@ -7,14 +7,6 @@ export const currentUser = {
   name: 'Jordan Lee',
   handle: '@jordan',
   role: 'Student · Lincoln High',
-  // Permission role per group. Hardcoded for now — the single source of truth
-  // for "what may this user do here", ready to be replaced by real auth.
-  // Captain of the soccer team, plain Member of robotics, Admin of the study group.
-  rolesByGroup: {
-    g1: 'Captain',
-    g2: 'Member',
-    g3: 'Admin',
-  },
   stats: {
     groups: 3,
     votesCast: 27,
@@ -42,12 +34,17 @@ export const groups = [
   {
     id: 'g3',
     name: 'AP Bio Study Group',
-    role: 'Organizer',
+    role: 'Admin',
     members: 9,
     emoji: '🧬',
     kind: 'Class',
   },
 ];
+
+// The `role` field on each group is the current user's permission role within
+// it (Admin / Captain / Member) — the single source of truth for "what may I do
+// here". The GroupsProvider (src/state/groups.js) owns this at runtime so newly
+// created/joined groups carry a role too; swap it for real auth later.
 
 // Feed posts keyed by group id.
 export const feedByGroup = {

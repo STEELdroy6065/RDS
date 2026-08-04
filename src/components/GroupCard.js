@@ -8,10 +8,7 @@ import { colors, spacing, type } from '../theme';
 
 // A single group row used on Home and Groups.
 export default function GroupCard({ group, onPress }) {
-  const roleTone =
-    group.role === 'Captain' || group.role === 'Organizer'
-      ? 'primary'
-      : 'neutral';
+  const roleTone = group.role === 'Member' ? 'neutral' : 'primary';
 
   return (
     <Card onPress={onPress} style={styles.card}>

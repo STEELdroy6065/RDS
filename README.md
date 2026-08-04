@@ -37,7 +37,8 @@ detail flow.
 | **Welcome** | `WelcomeScreen` | One-line pitch + "Get Started". |
 | **Sign up / Log in** | `AuthScreen` | Mock form (name, email); "Continue" enters the app. Log in toggle is visual-only. |
 | **Home** | `HomeScreen` | Greeting, quick stats, and the user's groups. |
-| **Groups** | `GroupsScreen` | Full group list + a visual-only "New group" stub. |
+| **Groups** | `GroupsScreen` | Live group list + "New group" → create or join. |
+| **New group** | `NewGroupScreen` | Create (name + template) or Join (code / discoverable list); both add to the live groups and open the group. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
 | **Profile** | `ProfileScreen` | Profile card + non-functional settings rows. |
 | **Group Detail** | `GroupDetailScreen` | Group header + four module cards. |
@@ -91,12 +92,14 @@ src/
       AttendanceScreen.js
   components/               Reusable UI (Card, Avatar, Badge, Header, …)
   state/
-    session.js             Current user + per-group role (swappable for auth)
+    session.js             Current user identity (swappable for auth)
+    groups.js              In-memory GroupsProvider (create/join, roster, role)
     votes.js               In-memory VotesProvider (create/cast/close)
     voteRules.js           Pure tally + permission + visibility rules
   data/
     mock.js                Groups, members, feed, alerts, current user
     votesSeed.js           Seed votes with named ballots
+    discoverable.js        Join-tab groups + create-tab templates
   theme/                   Color palette, typography, spacing tokens
 ```
 

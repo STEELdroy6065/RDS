@@ -6,6 +6,7 @@ import Card from '../../components/Card';
 import Header from '../../components/Header';
 import { colors, spacing, radius, type, shadow } from '../../theme';
 import { useSession } from '../../state/session';
+import { useGroups } from '../../state/groups';
 import { useVotes } from '../../state/votes';
 import {
   totalVotes,
@@ -24,10 +25,11 @@ const STATUS_TONE = {
 
 export default function VotesScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const { user, roleInGroup } = useSession();
+  const { user } = useSession();
+  const { roleForGroup } = useGroups();
   const { votesForGroup } = useVotes();
 
-  const role = roleInGroup(groupId);
+  const role = roleForGroup(groupId);
   const mayCreate = canCreateVote(role);
   const votes = votesForGroup(groupId);
 

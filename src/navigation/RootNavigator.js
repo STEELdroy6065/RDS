@@ -12,6 +12,7 @@ import GroupsScreen from '../screens/GroupsScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import NewGroupScreen from '../screens/NewGroupScreen';
 import FeedScreen from '../screens/modules/FeedScreen';
 import VotesScreen from '../screens/modules/VotesScreen';
 import VoteDetailScreen from '../screens/modules/VoteDetailScreen';
@@ -95,6 +96,7 @@ export default function RootNavigator() {
         <Stack.Screen name="Auth" component={AuthScreen} />
 
         <Stack.Screen name="Tabs" component={Tabs} />
+        <Stack.Screen name="NewGroup" component={NewGroupScreen} />
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} />
         <Stack.Screen name="Votes" component={VotesScreen} />

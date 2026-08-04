@@ -6,13 +6,14 @@ import Avatar from '../../components/Avatar';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
 import { colors, spacing, type } from '../../theme';
-import { membersByGroup } from '../../data/mock';
+import { useGroups } from '../../state/groups';
 
-const LEAD_ROLES = ['Coach', 'Advisor', 'Captain', 'Organizer', 'Lead'];
+const LEAD_ROLES = ['Coach', 'Advisor', 'Captain', 'Organizer', 'Lead', 'Admin'];
 
 export default function MembersScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const members = membersByGroup[groupId] || [];
+  const { membersForGroup } = useGroups();
+  const members = membersForGroup(groupId);
 
   return (
     <Screen>
@@ -25,7 +26,9 @@ export default function MembersScreen({ route, navigation }) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.count}>{members.length} people</Text>
+        <Text style={styles.count}>
+          {members.length} {members.length === 1 ? 'person' : 'people'}
+        </Text>
         <Card padded={false}>
           {members.map((m, i) => (
             <View
