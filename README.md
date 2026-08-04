@@ -28,10 +28,14 @@ npm run web       # browser
 
 ## What's in the skeleton
 
-Bottom tab navigation with four tabs, plus a group detail flow.
+The app opens into an onboarding flow, then a bottom-tab shell with a group
+detail flow.
 
 | Area | Screen | Notes |
 | --- | --- | --- |
+| **Splash** | `SplashScreen` | Synq wordmark; auto-advances (or tap). |
+| **Welcome** | `WelcomeScreen` | One-line pitch + "Get Started". |
+| **Sign up / Log in** | `AuthScreen` | Mock form (name, email); "Continue" enters the app. Log in toggle is visual-only. |
 | **Home** | `HomeScreen` | Greeting, quick stats, and the user's groups. |
 | **Groups** | `GroupsScreen` | Full group list + a visual-only "New group" stub. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
@@ -67,8 +71,12 @@ Tapping a group opens its detail screen, which routes into four modules:
 App.js                     App entry (providers + navigator)
 src/
   navigation/
-    RootNavigator.js       Bottom tabs + stack (detail & modules)
+    RootNavigator.js       Onboarding + bottom tabs + stack (detail & modules)
   screens/
+    onboarding/
+      SplashScreen.js
+      WelcomeScreen.js
+      AuthScreen.js
     HomeScreen.js
     GroupsScreen.js
     AlertsScreen.js

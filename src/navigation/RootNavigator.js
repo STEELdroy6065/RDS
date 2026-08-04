@@ -4,6 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
+import SplashScreen from '../screens/onboarding/SplashScreen';
+import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
+import AuthScreen from '../screens/onboarding/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import AlertsScreen from '../screens/AlertsScreen';
@@ -82,7 +85,15 @@ function Tabs() {
 export default function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        initialRouteName="Splash"
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Onboarding flow — the app opens here before the main tabs. */}
+        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen name="Auth" component={AuthScreen} />
+
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} />
