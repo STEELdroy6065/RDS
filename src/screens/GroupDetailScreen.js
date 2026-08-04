@@ -36,11 +36,10 @@ const MODULES = [
   {
     key: 'Attendance',
     title: 'Attendance',
-    subtitle: 'Coming soon',
+    subtitle: 'Roll & check-ins',
     icon: 'calendar',
     bg: colors.successSoft,
     fg: colors.success,
-    comingSoon: true,
   },
 ];
 

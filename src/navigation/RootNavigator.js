@@ -19,6 +19,7 @@ import VoteDetailScreen from '../screens/modules/VoteDetailScreen';
 import NewVoteScreen from '../screens/modules/NewVoteScreen';
 import MembersScreen from '../screens/modules/MembersScreen';
 import AttendanceScreen from '../screens/modules/AttendanceScreen';
+import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 
 import { colors, type } from '../theme';
 
@@ -104,6 +105,7 @@ export default function RootNavigator() {
         <Stack.Screen name="NewVote" component={NewVoteScreen} />
         <Stack.Screen name="Members" component={MembersScreen} />
         <Stack.Screen name="Attendance" component={AttendanceScreen} />
+        <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -5,6 +5,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { SessionProvider } from './src/state/session';
 import { GroupsProvider } from './src/state/groups';
 import { VotesProvider } from './src/state/votes';
+import { AttendanceProvider } from './src/state/attendance';
 
 export default function App() {
   return (
@@ -13,7 +14,9 @@ export default function App() {
       <SessionProvider>
         <GroupsProvider>
           <VotesProvider>
-            <RootNavigator />
+            <AttendanceProvider>
+              <RootNavigator />
+            </AttendanceProvider>
           </VotesProvider>
         </GroupsProvider>
       </SessionProvider>

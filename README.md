@@ -63,8 +63,19 @@ Tapping a group opens its detail screen, which routes into four modules:
 
   Rules live in `src/state/voteRules.js`; vote state in `src/state/votes.js`.
 - **Members** — static roster of names and roles.
-- **Attendance** — a visually distinct *coming soon* card; reserved space, no
-  functionality yet.
+- **Attendance** — the app's core cascade, role-gated (in-memory):
+  - **Mark attendance** (Admin/Teacher only): a `MarkAttendanceScreen` with a
+    Present/Absent toggle per member and a timestamped **Submit**.
+  - **Missed check-in cascade** (Captain-facing): a dev-only "Simulate missed
+    check-in" button (shown under `__DEV__`) stands in for a real deadline
+    timer. It fires a Captain-facing alert — *"[Teacher] hasn't checked in —
+    [Group]"* — offering **Start self-study** or **Escalate to Admin**; either
+    logs a status entry.
+  - **History** — a read-only log for all members: timestamp, who marked it
+    (or "missed — Captain self-study / escalated"), and present count.
+
+  State in `src/state/attendance.js` (records, pending miss, history + the
+  `canMarkAttendance` / `receivesCascade` rules).
 
 ## Project structure
 
@@ -89,13 +100,15 @@ src/
       VoteDetailScreen.js   Named results, live/hidden logic, close action
       NewVoteScreen.js      Create-vote form (Captain/Admin only)
       MembersScreen.js
-      AttendanceScreen.js
+      AttendanceScreen.js    Cascade overview: mark action, alert, history
+      MarkAttendanceScreen.js Present/Absent roll (Admin/Teacher only)
   components/               Reusable UI (Card, Avatar, Badge, Header, …)
   state/
     session.js             Current user identity (swappable for auth)
     groups.js              In-memory GroupsProvider (create/join, roster, role)
     votes.js               In-memory VotesProvider (create/cast/close)
     voteRules.js           Pure tally + permission + visibility rules
+    attendance.js          Attendance records, missed-check-in cascade, history
   data/
     mock.js                Groups, members, feed, alerts, current user
     votesSeed.js           Seed votes with named ballots
