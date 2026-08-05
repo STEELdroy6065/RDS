@@ -5,6 +5,7 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -30,6 +31,8 @@ export default function NewVoteScreen({ route, navigation }) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [visibility, setVisibility] = useState('live'); // 'live' | 'hidden'
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   // Defensive guard: this screen should be unreachable for Members.
   const role = roleForGroup(groupId);
@@ -48,7 +51,8 @@ export default function NewVoteScreen({ route, navigation }) {
   }
 
   const filledOptions = options.map((o) => o.trim()).filter(Boolean);
-  const isValid = question.trim().length > 0 && filledOptions.length >= MIN_OPTIONS;
+  const isValid =
+    question.trim().length > 0 && filledOptions.length >= MIN_OPTIONS && !busy;
 
   function setOption(index, value) {
     setOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
@@ -64,17 +68,24 @@ export default function NewVoteScreen({ route, navigation }) {
     }
   }
 
-  function submit() {
+  async function submit() {
     if (!isValid) return;
-    const voteId = createVote({
-      groupId,
-      question,
-      options: filledOptions,
-      visibility,
-      creator: user,
-    });
-    // Replace so Back returns to the votes list, not the empty form.
-    navigation.replace('VoteDetail', { voteId, groupName });
+    setBusy(true);
+    setError('');
+    try {
+      const voteId = await createVote({
+        groupId,
+        question,
+        options: filledOptions,
+        visibility,
+        creator: user,
+      });
+      // Replace so Back returns to the votes list, not the empty form.
+      navigation.replace('VoteDetail', { voteId, groupName });
+    } catch (e) {
+      setError((e && e.message) || 'Could not create the vote. Please try again.');
+      setBusy(false);
+    }
   }
 
   return (
@@ -158,6 +169,12 @@ export default function NewVoteScreen({ route, navigation }) {
 
         {/* Submit */}
         <View style={styles.footer}>
+          {error ? (
+            <View style={styles.errorNote}>
+              <Ionicons name="alert-circle" size={16} color={colors.accent} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
           <Pressable
             onPress={submit}
             disabled={!isValid}
@@ -167,9 +184,13 @@ export default function NewVoteScreen({ route, navigation }) {
               pressed && isValid && styles.pressed,
             ]}
           >
-            <Text style={[styles.submitText, !isValid && styles.submitTextDisabled]}>
-              Create vote
-            </Text>
+            {busy ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Text style={[styles.submitText, !isValid && styles.submitTextDisabled]}>
+                Create vote
+              </Text>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -315,9 +336,26 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
   },
   submitDisabled: { backgroundColor: colors.surfaceAlt },
   submitText: { ...type.bodyStrong, color: colors.onPrimary },
   submitTextDisabled: { color: colors.muted },
   pressed: { opacity: 0.85 },
+  errorNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  errorText: {
+    ...type.caption,
+    color: colors.accent,
+    marginLeft: spacing.sm,
+    flex: 1,
+    lineHeight: 18,
+  },
 });

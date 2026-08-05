@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
@@ -27,11 +28,26 @@ export default function VotesScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
   const { user } = useSession();
   const { roleForGroup } = useGroups();
-  const { votesForGroup } = useVotes();
+  const { votesForGroup, refreshGroup } = useVotes();
 
   const role = roleForGroup(groupId);
   const mayCreate = canCreateVote(role);
   const votes = votesForGroup(groupId);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Reload whenever this screen comes into focus (e.g. returning from creating
+  // or voting), so the list reflects the latest server state.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setRefreshing(true);
+      refreshGroup(groupId).finally(() => active && setRefreshing(false));
+      return () => {
+        active = false;
+      };
+    }, [groupId, refreshGroup])
+  );
 
   return (
     <Screen>
@@ -39,6 +55,13 @@ export default function VotesScreen({ route, navigation }) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => refreshGroup(groupId)}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Create action — only Captains/Admins ever see this. */}
         {mayCreate ? (
@@ -66,12 +89,16 @@ export default function VotesScreen({ route, navigation }) {
 
         {votes.length === 0 ? (
           <Card style={styles.empty}>
-            <Text style={styles.emptyTitle}>No votes yet</Text>
-            <Text style={styles.emptySub}>
-              {mayCreate
-                ? 'Create the first vote for this group.'
-                : 'Nothing to vote on right now.'}
+            <Text style={styles.emptyTitle}>
+              {refreshing ? 'Loading votes…' : 'No votes yet'}
             </Text>
+            {!refreshing ? (
+              <Text style={styles.emptySub}>
+                {mayCreate
+                  ? 'Create the first vote for this group.'
+                  : 'Nothing to vote on right now.'}
+              </Text>
+            ) : null}
           </Card>
         ) : (
           votes.map((vote) => (

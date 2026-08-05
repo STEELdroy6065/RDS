@@ -17,7 +17,10 @@ export const ROLES = { ADMIN: 'Admin', CAPTAIN: 'Captain', MEMBER: 'Member' };
 // --- Tallying -------------------------------------------------------------
 
 export function totalVotes(vote) {
-  return Object.keys(vote.ballots).length;
+  // Prefer the server-computed count: for a hidden vote, a non-creator can't
+  // read the individual ballots, so ballot keys would undercount.
+  if (typeof vote.total === 'number') return vote.total;
+  return Object.keys(vote.ballots || {}).length;
 }
 
 export function countForOption(vote, optionId) {

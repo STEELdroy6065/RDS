@@ -30,9 +30,12 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 
 ### 2. Create the database schema
 
-In the Supabase dashboard → **SQL Editor**, paste and run the contents of
-[`supabase/schema.sql`](supabase/schema.sql). This creates the `groups` and
-`memberships` tables, the RLS policies, and a helper function.
+In the Supabase dashboard → **SQL Editor**, run these two files (in order):
+
+1. [`supabase/schema.sql`](supabase/schema.sql) — `groups` + `memberships` tables and RLS.
+2. [`supabase/votes.sql`](supabase/votes.sql) — `votes`, `vote_options`, `vote_ballots` tables, RLS, and helper functions.
+
+Each is idempotent (safe to re-run).
 
 > For quick testing, you may want to disable email confirmation:
 > dashboard → Authentication → Providers → Email → turn off "Confirm email".
@@ -71,7 +74,8 @@ detail flow.
 Tapping a group opens its detail screen, which routes into four modules:
 
 - **Feed** — mock posts with type tag, author, text, and time.
-- **Votes** — a **role-based** voting system (in-memory):
+- **Votes** — a **role-based** voting system, backed by **Supabase** (real
+  tables + RLS):
   - Each user has a permission role per group (Admin / Captain / Member),
     resolved through a swappable session layer (`src/state/session.js`).
   - **Captains and Admins** can create votes (question, 2–5 options, and a
@@ -84,7 +88,11 @@ Tapping a group opens its detail screen, which routes into four modules:
   - Only the **creator** can close a vote; once closed, named results are
     visible to everyone and no further votes can be cast.
 
-  Rules live in `src/state/voteRules.js`; vote state in `src/state/votes.js`.
+  The hidden/live/closed rules are now **enforced by RLS**, not just the UI: a
+  non-creator literally cannot read the individual ballots of a hidden, open
+  vote (the count comes from a member-gated SQL function). Rules live in
+  `src/state/voteRules.js`; data access in `src/state/votes.js`; schema in
+  `supabase/votes.sql`.
 - **Members** — static roster of names and roles.
 - **Attendance** — the app's core cascade, role-gated (in-memory):
   - **Mark attendance** (Admin/Teacher only): a `MarkAttendanceScreen` with a
@@ -131,7 +139,7 @@ src/
   state/
     session.js             Supabase Auth session (user, signUp/signIn/signOut)
     groups.js              Supabase-backed groups/memberships (create/join, role)
-    votes.js               In-memory VotesProvider (create/cast/close)
+    votes.js               Supabase-backed VotesProvider (create/cast/close)
     voteRules.js           Pure tally + permission + visibility rules
     attendance.js          Attendance records, missed-check-in cascade, history
   data/
@@ -140,7 +148,8 @@ src/
     discoverable.js        Create-tab group templates (type → emoji/kind)
   theme/                   Color palette, typography, spacing tokens
 supabase/
-  schema.sql               Tables + RLS policies (run in the SQL editor)
+  schema.sql               Groups + memberships tables + RLS
+  votes.sql                Votes tables + RLS + helper functions
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -163,9 +172,16 @@ Real in this step: **Auth** and **groups / membership**.
   membership rows only for those groups. A `SECURITY DEFINER` helper
   (`is_group_member`) keeps the policies recursion-free.
 
-> Not yet real (still local mock, unchanged): Feed, Votes, Attendance. There is
-> no `profiles` table yet, so member lists can only show your own name; other
-> members appear as "Group member".
+**Also real: Votes** (`supabase/votes.sql`) — `votes`, `vote_options`, and
+`vote_ballots` tables. RLS enforces that only a group's Admin/Captain can create
+a vote, only members can see or cast, only the creator can close, and the
+hidden-vs-live results rule (a member-gated SQL function returns the
+participation count so a hidden vote can show "X people have voted" without
+exposing any ballots).
+
+> Still local mock (unchanged): Feed and Attendance. There is no `profiles`
+> table yet, so names are denormalized onto rows at write time; historical rows
+> created by others show "Group member".
 
 ## Design
 
@@ -179,7 +195,7 @@ A restrained, product-minded system rather than a generic dashboard template:
 
 ## Status
 
-Real: accounts (Supabase Auth) and groups/membership with roles + RLS. Local
-mock (unchanged this step): Feed, Votes, Attendance. Next steps: a `profiles`
-table for real member names, then moving Votes and Attendance onto Supabase,
-plus push notifications.
+Real: accounts (Supabase Auth), groups/membership with roles + RLS, and **votes**
+(role-gated create/cast/close with RLS-enforced visibility). Local mock
+(unchanged): Feed and Attendance. Next steps: a `profiles` table for real member
+names, moving Attendance onto Supabase, and push notifications.

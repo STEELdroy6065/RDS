@@ -105,9 +105,8 @@ export const feedByGroup = {
   ],
 };
 
-// Note: live vote/poll data now lives in src/data/votesSeed.js and is managed
-// through the VotesProvider (src/state/votes.js), since votes are created and
-// mutated at runtime rather than being static content.
+// Note: votes now live in Supabase, managed through the VotesProvider
+// (src/state/votes.js). Feed and Attendance below remain local mock for now.
 
 // Members keyed by group id.
 export const membersByGroup = {

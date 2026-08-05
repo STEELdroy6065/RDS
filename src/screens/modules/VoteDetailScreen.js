@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -8,7 +8,7 @@ import Header from '../../components/Header';
 import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
 import { useVotes } from '../../state/votes';
-import { confirm } from '../../lib/confirm';
+import { confirm, notify } from '../../lib/confirm';
 import {
   totalVotes,
   countForOption,
@@ -25,15 +25,38 @@ import {
 export default function VoteDetailScreen({ route, navigation }) {
   const { voteId, groupName } = route.params;
   const { user } = useSession();
-  const { getVote, castVote, closeVote } = useVotes();
+  const { getVote, refreshVote, castVote, closeVote } = useVotes();
+
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    refreshVote(voteId).finally(() => active && setLoaded(true));
+    return () => {
+      active = false;
+    };
+  }, [voteId, refreshVote]);
 
   const vote = getVote(voteId);
+
+  async function handleCast(optionId) {
+    try {
+      await castVote(voteId, optionId, user);
+    } catch (e) {
+      notify({ title: 'Could not save your vote', message: e && e.message });
+    }
+  }
+
   if (!vote) {
     return (
       <Screen>
         <Header title="Vote" subtitle={groupName} onBack={() => navigation.goBack()} />
         <View style={styles.missing}>
-          <Text style={styles.missingText}>This vote is no longer available.</Text>
+          {loaded ? (
+            <Text style={styles.missingText}>This vote is no longer available.</Text>
+          ) : (
+            <ActivityIndicator color={colors.primary} />
+          )}
         </View>
       </Screen>
     );
@@ -54,7 +77,13 @@ export default function VoteDetailScreen({ route, navigation }) {
         'Results and voter names become visible to everyone, and no more votes can be cast. This can’t be undone.',
       confirmLabel: 'Close vote',
       destructive: true,
-      onConfirm: () => closeVote(vote.id),
+      onConfirm: async () => {
+        try {
+          await closeVote(vote.id);
+        } catch (e) {
+          notify({ title: 'Could not close the vote', message: e && e.message });
+        }
+      },
     });
   }
 
@@ -105,7 +134,7 @@ export default function VoteDetailScreen({ route, navigation }) {
                 seeResults={seeResults}
                 total={total}
                 currentUserId={user.id}
-                onPress={() => open && castVote(vote.id, opt.id, user)}
+                onPress={() => open && handleCast(opt.id)}
               />
             ))}
           </View>
