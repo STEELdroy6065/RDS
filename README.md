@@ -3,9 +3,9 @@
 **Intelligent group coordination for schools, clubs, and teams** — attendance,
 communication, and voting in one place.
 
-Synq is a React Native (Expo) app. **Accounts and groups/membership are now
-real, backed by Supabase** (Auth + Postgres with Row Level Security). Feed,
-Votes, and Attendance remain local/mock state for now.
+Synq is a React Native (Expo) app backed by **Supabase** (Auth + Postgres with
+Row Level Security). Accounts, groups/membership, votes, attendance, and the
+feed are all real; every module reads and writes real data.
 
 ## Getting started
 
@@ -35,6 +35,7 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 1. [`supabase/schema.sql`](supabase/schema.sql) — `groups` + `memberships` tables and RLS.
 2. [`supabase/votes.sql`](supabase/votes.sql) — `votes`, `vote_options`, `vote_ballots` tables, RLS, and helper functions.
 3. [`supabase/attendance.sql`](supabase/attendance.sql) — `attendance_records`, `attendance_entries`, a per-group check-in deadline column, RLS, and helpers.
+4. [`supabase/feed.sql`](supabase/feed.sql) — `posts` table and RLS.
 
 Each is idempotent (safe to re-run).
 
@@ -74,7 +75,10 @@ detail flow.
 
 Tapping a group opens its detail screen, which routes into four modules:
 
-- **Feed** — mock posts with type tag, author, text, and time.
+- **Feed** — real posts backed by **Supabase** (`posts` table). Any group
+  member can create a post (Announcement / Resource / Discussion); RLS limits
+  reading and posting to group members. Newest-first, with the author's name
+  and a relative timestamp.
 - **Votes** — a **role-based** voting system, backed by **Supabase** (real
   tables + RLS):
   - Each user has a permission role per group (Admin / Captain / Member),
@@ -131,7 +135,8 @@ src/
     ProfileScreen.js
     GroupDetailScreen.js
     modules/
-      FeedScreen.js
+      FeedScreen.js         Supabase posts (newest first)
+      NewPostScreen.js      Create a post (type + text)
       VotesScreen.js        List of a group's votes + gated "New vote"
       VoteDetailScreen.js   Named results, live/hidden logic, close action
       NewVoteScreen.js      Create-vote form (Captain/Admin only)
@@ -156,6 +161,7 @@ supabase/
   schema.sql               Groups + memberships tables + RLS
   votes.sql                Votes tables + RLS + helper functions
   attendance.sql           Attendance tables + deadline column + RLS
+  feed.sql                 Posts table + RLS
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -191,9 +197,12 @@ each group. The missed-check-in state is computed on read (past the deadline
 with no record today), so there's no scheduled job. RLS: only Admin/Teacher can
 submit, only the Captain can resolve a miss, all members can read.
 
-> Still local mock (unchanged): Feed. There is no `profiles` table yet, so names
-> are denormalized onto rows at write time; rows created by others show
-> "Group member".
+**Also real: Feed** (`supabase/feed.sql`) — a `posts` table; any group member
+can post (Announcement / Resource / Discussion), and RLS limits reading and
+posting to members.
+
+> There is no `profiles` table yet, so names are denormalized onto rows at write
+> time; rows created by others before that exists show "Group member".
 
 ## Design
 
@@ -207,8 +216,9 @@ A restrained, product-minded system rather than a generic dashboard template:
 
 ## Status
 
-Real: accounts (Supabase Auth), groups/membership with roles + RLS, **votes**
-(role-gated create/cast/close with RLS-enforced visibility), and **attendance**
-(lazy missed-check-in, role-gated). Local mock (unchanged): Feed. Next steps: a
-`profiles` table for real member names, and push notifications (a scheduled job
-so the missed-check-in can reach people who never open the app).
+Real on Supabase: accounts (Auth), groups/membership with roles + RLS, **votes**
+(role-gated create/cast/close with RLS-enforced visibility), **attendance** (lazy
+missed-check-in, role-gated), and **feed** (member posts). Every module is now
+backed by real data. Next steps: a `profiles` table for real member names, and
+push notifications (a scheduled job so the missed-check-in can reach people who
+never open the app).

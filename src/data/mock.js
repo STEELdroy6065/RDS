@@ -46,67 +46,8 @@ export const groups = [
 // here". The GroupsProvider (src/state/groups.js) owns this at runtime so newly
 // created/joined groups carry a role too; swap it for real auth later.
 
-// Feed posts keyed by group id.
-export const feedByGroup = {
-  g1: [
-    {
-      id: 'p1',
-      type: 'Announcement',
-      author: 'Coach Rivera',
-      text: 'Saturday scrimmage moved to the turf field. Cleats + shin guards required.',
-      time: '2h',
-    },
-    {
-      id: 'p2',
-      type: 'Event',
-      author: 'Jordan Lee',
-      text: 'Team dinner after Friday’s home game — sign up in Votes for a time.',
-      time: '5h',
-    },
-    {
-      id: 'p3',
-      type: 'Update',
-      author: 'Sam Okafor',
-      text: 'New jerseys arrived! Grab yours from the equipment room this week.',
-      time: '1d',
-    },
-  ],
-  g2: [
-    {
-      id: 'p1',
-      type: 'Announcement',
-      author: 'Ms. Chen',
-      text: 'Regional qualifier registration closes Friday. Confirm your slot.',
-      time: '3h',
-    },
-    {
-      id: 'p2',
-      type: 'Update',
-      author: 'Priya N.',
-      text: 'Drivetrain v2 is assembled — testing tonight in the lab.',
-      time: '1d',
-    },
-  ],
-  g3: [
-    {
-      id: 'p1',
-      type: 'Event',
-      author: 'Jordan Lee',
-      text: 'Review session for Unit 6 this Thursday. Bring your practice FRQs.',
-      time: '4h',
-    },
-    {
-      id: 'p2',
-      type: 'Update',
-      author: 'Alex Kim',
-      text: 'Shared the cellular respiration flashcards in the group drive.',
-      time: '2d',
-    },
-  ],
-};
-
-// Note: votes now live in Supabase, managed through the VotesProvider
-// (src/state/votes.js). Feed and Attendance below remain local mock for now.
+// Note: votes, attendance, and feed posts now live in Supabase. The mock
+// members roster below is still used as a fallback for the seeded group ids.
 
 // Members keyed by group id.
 export const membersByGroup = {
