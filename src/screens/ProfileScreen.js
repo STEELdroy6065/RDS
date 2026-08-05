@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
 import Card from '../components/Card';
@@ -8,6 +8,7 @@ import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, radius, type } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
+import { confirm } from '../lib/confirm';
 
 const SETTINGS = [
   { id: 's1', icon: 'notifications-outline', label: 'Notifications' },
@@ -25,10 +26,13 @@ export default function ProfileScreen() {
   const subtitle = user ? user.email : '';
 
   function confirmSignOut() {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => signOut() },
-    ]);
+    confirm({
+      title: 'Log out',
+      message: 'Are you sure you want to log out?',
+      confirmLabel: 'Log out',
+      destructive: true,
+      onConfirm: () => signOut(),
+    });
   }
 
   return (

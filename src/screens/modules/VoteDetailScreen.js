@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Alert,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -15,6 +8,7 @@ import Header from '../../components/Header';
 import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
 import { useVotes } from '../../state/votes';
+import { confirm } from '../../lib/confirm';
 import {
   totalVotes,
   countForOption,
@@ -54,18 +48,14 @@ export default function VoteDetailScreen({ route, navigation }) {
   const label = statusLabel(vote);
 
   function onClose() {
-    Alert.alert(
-      'Close this vote?',
-      'Results and voter names become visible to everyone, and no more votes can be cast. This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Close vote',
-          style: 'destructive',
-          onPress: () => closeVote(vote.id),
-        },
-      ]
-    );
+    confirm({
+      title: 'Close this vote?',
+      message:
+        'Results and voter names become visible to everyone, and no more votes can be cast. This can’t be undone.',
+      confirmLabel: 'Close vote',
+      destructive: true,
+      onConfirm: () => closeVote(vote.id),
+    });
   }
 
   return (

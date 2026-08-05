@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
@@ -9,6 +9,7 @@ import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
 import { useAttendance, canMarkAttendance } from '../../state/attendance';
+import { notify } from '../../lib/confirm';
 
 export default function MarkAttendanceScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
@@ -56,11 +57,11 @@ export default function MarkAttendanceScreen({ route, navigation }) {
       byName: user.name,
       byRole: role,
     });
-    Alert.alert(
-      'Attendance submitted',
-      `${presentCount} of ${total} marked present.`,
-      [{ text: 'Done', onPress: () => navigation.goBack() }]
-    );
+    notify({
+      title: 'Attendance submitted',
+      message: `${presentCount} of ${total} marked present.`,
+      onDismiss: () => navigation.goBack(),
+    });
   }
 
   return (
