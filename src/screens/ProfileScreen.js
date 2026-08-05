@@ -6,7 +6,6 @@ import Card from '../components/Card';
 import Avatar from '../components/Avatar';
 import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, radius, type } from '../theme';
-import { currentUser } from '../data/mock';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 
@@ -21,7 +20,6 @@ const SETTINGS = [
 export default function ProfileScreen() {
   const { user, signOut } = useSession();
   const { groups } = useGroups();
-  const stats = currentUser.stats; // votes/attendance stats stay mock for now
 
   const name = user ? user.name : 'Member';
   const subtitle = user ? user.email : '';
@@ -53,9 +51,9 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <Stat value={groups.length} label="Groups" />
             <View style={styles.vDivider} />
-            <Stat value={stats.votesCast} label="Votes cast" />
+            <Stat value={0} label="Votes cast" />
             <View style={styles.vDivider} />
-            <Stat value={stats.attendance} label="Attendance" />
+            <Stat value="—" label="Attendance" />
           </View>
         </Card>
 
