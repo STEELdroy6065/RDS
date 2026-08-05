@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
 import Header from '../../components/Header';
 import { colors, spacing, radius, type } from '../../theme';
-import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
 import { useAttendance, canMarkAttendance } from '../../state/attendance';
 import { notify } from '../../lib/confirm';
 
 export default function MarkAttendanceScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const { user } = useSession();
   const { roleForGroup, membersForGroup } = useGroups();
   const { submitAttendance } = useAttendance();
 
@@ -28,6 +26,7 @@ export default function MarkAttendanceScreen({ route, navigation }) {
     });
     return init;
   });
+  const [busy, setBusy] = useState(false);
 
   // Defensive guard: only Admin/Teacher can reach this.
   if (!canMarkAttendance(role)) {
@@ -50,18 +49,31 @@ export default function MarkAttendanceScreen({ route, navigation }) {
   const toggle = (id, value) =>
     setPresent((prev) => ({ ...prev, [id]: value }));
 
-  function submit() {
-    submitAttendance(groupId, {
-      presentCount,
-      totalCount: total,
-      byName: user.name,
-      byRole: role,
-    });
-    notify({
-      title: 'Attendance submitted',
-      message: `${presentCount} of ${total} marked present.`,
-      onDismiss: () => navigation.goBack(),
-    });
+  async function submit() {
+    if (busy) return;
+    setBusy(true);
+    const entries = members.map((m) => ({
+      user_id: m.id,
+      member_name: m.name,
+      present: !!present[m.id],
+    }));
+    try {
+      await submitAttendance(groupId, { entries, presentCount, totalCount: total });
+      notify({
+        title: 'Attendance submitted',
+        message: `${presentCount} of ${total} marked present.`,
+        onDismiss: () => navigation.goBack(),
+      });
+    } catch (e) {
+      setBusy(false);
+      notify({
+        title: 'Could not submit attendance',
+        message:
+          e && /duplicate|unique/i.test(e.message || '')
+            ? 'Attendance for today has already been recorded.'
+            : e && e.message,
+      });
+    }
   }
 
   return (
@@ -95,10 +107,17 @@ export default function MarkAttendanceScreen({ route, navigation }) {
       <View style={styles.footer}>
         <Pressable
           onPress={submit}
+          disabled={busy}
           style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
         >
-          <Ionicons name="checkmark-done" size={18} color={colors.onPrimary} />
-          <Text style={styles.ctaText}>Submit attendance</Text>
+          {busy ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <>
+              <Ionicons name="checkmark-done" size={18} color={colors.onPrimary} />
+              <Text style={styles.ctaText}>Submit attendance</Text>
+            </>
+          )}
         </Pressable>
       </View>
     </Screen>

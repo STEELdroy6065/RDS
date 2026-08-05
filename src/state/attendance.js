@@ -1,117 +1,124 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
+import { supabase } from '../lib/supabase';
+import { useSession } from './session';
 
-// In-memory attendance state: submitted records, a pending "missed check-in"
-// per group, and read-only history. No backend — the missed-check-in deadline
-// is simulated by a dev button instead of a real timer.
-//
-// History record shape:
-//   { id, at, kind, byName, byRole, presentCount, totalCount }
-//   kind: 'marked'      — an Admin/Teacher submitted attendance
-//         'self-study'  — Captain started a self-study session after a miss
-//         'escalated'   — Captain escalated a miss to Admin
+// Attendance backed by Supabase. The "missed check-in" state is NOT stored — it
+// is computed on read (past today's deadline + no record for today). Submitting
+// or resolving simply inserts today's record.
 
 const AttendanceContext = createContext(null);
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// Platform-safe timestamp (avoids relying on Intl under Hermes).
-export function stamp(d = new Date()) {
-  let h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()} · ${h}:${m} ${ampm}`;
-}
-
-// Roles that count as the group's "teacher"/lead for a missed check-in.
-const LEAD_ROLES = ['Coach', 'Advisor', 'Admin', 'Teacher', 'Organizer', 'Lead'];
-
-export function leadName(members = []) {
-  const lead = members.find((m) => LEAD_ROLES.includes(m.role));
-  return lead ? lead.name : 'The teacher';
-}
-
-// Permission helpers.
+// Permission helpers (roles come from the groups store).
 export const canMarkAttendance = (role) => role === 'Admin';
 export const receivesCascade = (role) => role === 'Captain';
 
-// Seed a little history so the log isn't empty for the original groups.
-const seedHistory = {
-  g1: [
-    { id: 'ah1', at: 'Yesterday · 8:05 AM', kind: 'marked', byName: 'Coach Rivera', byRole: 'Coach', presentCount: 5, totalCount: 6 },
-    { id: 'ah2', at: 'Mon · 8:02 AM', kind: 'marked', byName: 'Coach Rivera', byRole: 'Coach', presentCount: 6, totalCount: 6 },
-  ],
-  g2: [
-    { id: 'ah1', at: 'Fri · 4:00 PM', kind: 'self-study', byName: 'Priya Nadar', byRole: 'Captain', presentCount: null, totalCount: null },
-  ],
-  g3: [
-    { id: 'ah1', at: 'Yesterday · 3:15 PM', kind: 'marked', byName: 'Jordan Lee', byRole: 'Admin', presentCount: 3, totalCount: 4 },
-  ],
-};
+// Local calendar date as YYYY-MM-DD (matches the `date` column).
+export function localDateStr(d = new Date()) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
 
-let seq = 0;
-const uid = () => `a_${Date.now().toString(36)}_${seq++}`;
+// Is the current local time at/after the group's "HH:MM" deadline?
+export function isPastDeadline(deadline) {
+  if (!deadline) return false;
+  const [h, m] = deadline.split(':').map((n) => parseInt(n, 10));
+  if (Number.isNaN(h)) return false;
+  const now = new Date();
+  return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= (m || 0));
+}
 
 export function AttendanceProvider({ children }) {
-  const [history, setHistory] = useState(() => ({ ...seedHistory }));
-  const [pending, setPending] = useState({}); // groupId -> { teacherName, at } | undefined
+  const { user } = useSession();
+  const [recordsByGroup, setRecordsByGroup] = useState({});
+  const [loadingByGroup, setLoadingByGroup] = useState({});
 
-  const api = useMemo(
+  const refreshGroup = useCallback(async (groupId) => {
+    setLoadingByGroup((prev) => ({ ...prev, [groupId]: true }));
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('id, group_id, date, marked_by, marked_by_name, status, present_count, total_count, created_at')
+      .eq('group_id', groupId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (!error) {
+      setRecordsByGroup((prev) => ({ ...prev, [groupId]: data || [] }));
+    }
+    setLoadingByGroup((prev) => ({ ...prev, [groupId]: false }));
+  }, []);
+
+  // Admin/Teacher submits today's roll.
+  const submitAttendance = useCallback(
+    async (groupId, { entries, presentCount, totalCount }) => {
+      const { data: rec, error } = await supabase
+        .from('attendance_records')
+        .insert({
+          group_id: groupId,
+          date: localDateStr(),
+          marked_by: user.id,
+          marked_by_name: user.name,
+          status: 'submitted',
+          present_count: presentCount,
+          total_count: totalCount,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      if (entries && entries.length) {
+        const rows = entries.map((e) => ({
+          record_id: rec.id,
+          user_id: e.user_id,
+          member_name: e.member_name,
+          present: e.present,
+        }));
+        const { error: eErr } = await supabase.from('attendance_entries').insert(rows);
+        if (eErr) throw eErr;
+      }
+      await refreshGroup(groupId);
+    },
+    [user, refreshGroup]
+  );
+
+  // Captain resolves a missed check-in — creates today's record.
+  const resolveMissed = useCallback(
+    async (groupId, resolution) => {
+      const status =
+        resolution === 'self-study' ? 'missed_self_study' : 'missed_escalated';
+      const { error } = await supabase.from('attendance_records').insert({
+        group_id: groupId,
+        date: localDateStr(),
+        marked_by: user.id,
+        marked_by_name: user.name,
+        status,
+      });
+      if (error) throw error;
+      await refreshGroup(groupId);
+    },
+    [user, refreshGroup]
+  );
+
+  const value = useMemo(
     () => ({
-      historyFor: (groupId) => history[groupId] || [],
-      pendingFor: (groupId) => pending[groupId] || null,
-
-      submitAttendance: (groupId, { presentCount, totalCount, byName, byRole }) => {
-        const record = {
-          id: uid(),
-          at: stamp(),
-          kind: 'marked',
-          byName,
-          byRole,
-          presentCount,
-          totalCount,
-        };
-        setHistory((prev) => ({
-          ...prev,
-          [groupId]: [record, ...(prev[groupId] || [])],
-        }));
-      },
-
-      // Stand-in for a missed deadline: flag a pending missed check-in.
-      simulateMissed: (groupId, teacherName) => {
-        setPending((prev) => ({
-          ...prev,
-          [groupId]: { teacherName, at: stamp() },
-        }));
-      },
-
-      // Captain resolves the cascade — logs a status and clears the pending flag.
-      resolveMissed: (groupId, resolution, byName) => {
-        const record = {
-          id: uid(),
-          at: stamp(),
-          kind: resolution, // 'self-study' | 'escalated'
-          byName,
-          byRole: 'Captain',
-          presentCount: null,
-          totalCount: null,
-        };
-        setHistory((prev) => ({
-          ...prev,
-          [groupId]: [record, ...(prev[groupId] || [])],
-        }));
-        setPending((prev) => {
-          const next = { ...prev };
-          delete next[groupId];
-          return next;
-        });
-      },
+      historyFor: (groupId) => recordsByGroup[groupId] || [],
+      todayRecordFor: (groupId) =>
+        (recordsByGroup[groupId] || []).find((r) => r.date === localDateStr()) || null,
+      isLoading: (groupId) => !!loadingByGroup[groupId],
+      refreshGroup,
+      submitAttendance,
+      resolveMissed,
     }),
-    [history, pending]
+    [recordsByGroup, loadingByGroup, refreshGroup, submitAttendance, resolveMissed]
   );
 
   return (
-    <AttendanceContext.Provider value={api}>{children}</AttendanceContext.Provider>
+    <AttendanceContext.Provider value={value}>{children}</AttendanceContext.Provider>
   );
 }
 

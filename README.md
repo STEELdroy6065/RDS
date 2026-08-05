@@ -34,6 +34,7 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 
 1. [`supabase/schema.sql`](supabase/schema.sql) — `groups` + `memberships` tables and RLS.
 2. [`supabase/votes.sql`](supabase/votes.sql) — `votes`, `vote_options`, `vote_ballots` tables, RLS, and helper functions.
+3. [`supabase/attendance.sql`](supabase/attendance.sql) — `attendance_records`, `attendance_entries`, a per-group check-in deadline column, RLS, and helpers.
 
 Each is idempotent (safe to re-run).
 
@@ -94,19 +95,23 @@ Tapping a group opens its detail screen, which routes into four modules:
   `src/state/voteRules.js`; data access in `src/state/votes.js`; schema in
   `supabase/votes.sql`.
 - **Members** — static roster of names and roles.
-- **Attendance** — the app's core cascade, role-gated (in-memory):
-  - **Mark attendance** (Admin/Teacher only): a `MarkAttendanceScreen` with a
-    Present/Absent toggle per member and a timestamped **Submit**.
-  - **Missed check-in cascade** (Captain-facing): a dev-only "Simulate missed
-    check-in" button (shown under `__DEV__`) stands in for a real deadline
-    timer. It fires a Captain-facing alert — *"[Teacher] hasn't checked in —
-    [Group]"* — offering **Start self-study** or **Escalate to Admin**; either
-    logs a status entry.
-  - **History** — a read-only log for all members: timestamp, who marked it
-    (or "missed — Captain self-study / escalated"), and present count.
+- **Attendance** — the app's core cascade, role-gated and backed by **Supabase**:
+  - **Mark attendance** (Admin/Teacher only): `MarkAttendanceScreen` with a
+    Present/Absent toggle per member; **Submit** writes today's record + entries.
+  - **Missed check-in — computed on read, no background job**: each group has a
+    daily deadline (`check_in_deadline`, default `09:00`). When the screen
+    loads, if it's past the deadline and there's no record for today, the
+    missed state shows. The **Captain** sees **Start self-study** / **Escalate
+    to Admin** (either creates today's record); a regular member just sees
+    "check-in missed, Captain notified".
+  - **History** — a read-only log for all members: who marked it (or the missed
+    resolution), present count, and date.
 
-  State in `src/state/attendance.js` (records, pending miss, history + the
-  `canMarkAttendance` / `receivesCascade` rules).
+  RLS enforces the roles: only Admin/Teacher can submit, only the Captain can
+  resolve a miss, all members can read. Data access in
+  `src/state/attendance.js`; schema in `supabase/attendance.sql`.
+  (True push for people who never open the app still needs a scheduled job —
+  a later upgrade.)
 
 ## Project structure
 
@@ -141,7 +146,7 @@ src/
     groups.js              Supabase-backed groups/memberships (create/join, role)
     votes.js               Supabase-backed VotesProvider (create/cast/close)
     voteRules.js           Pure tally + permission + visibility rules
-    attendance.js          Attendance records, missed-check-in cascade, history
+    attendance.js          Supabase-backed attendance (lazy missed-check-in)
   data/
     mock.js                Groups, members, feed, alerts, current user
     votesSeed.js           Seed votes with named ballots
@@ -150,6 +155,7 @@ src/
 supabase/
   schema.sql               Groups + memberships tables + RLS
   votes.sql                Votes tables + RLS + helper functions
+  attendance.sql           Attendance tables + deadline column + RLS
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -179,9 +185,15 @@ hidden-vs-live results rule (a member-gated SQL function returns the
 participation count so a hidden vote can show "X people have voted" without
 exposing any ballots).
 
-> Still local mock (unchanged): Feed and Attendance. There is no `profiles`
-> table yet, so names are denormalized onto rows at write time; historical rows
-> created by others show "Group member".
+**Also real: Attendance** (`supabase/attendance.sql`) — `attendance_records`
+(one per group per day) + `attendance_entries`, plus a `check_in_deadline` on
+each group. The missed-check-in state is computed on read (past the deadline
+with no record today), so there's no scheduled job. RLS: only Admin/Teacher can
+submit, only the Captain can resolve a miss, all members can read.
+
+> Still local mock (unchanged): Feed. There is no `profiles` table yet, so names
+> are denormalized onto rows at write time; rows created by others show
+> "Group member".
 
 ## Design
 
@@ -195,7 +207,8 @@ A restrained, product-minded system rather than a generic dashboard template:
 
 ## Status
 
-Real: accounts (Supabase Auth), groups/membership with roles + RLS, and **votes**
-(role-gated create/cast/close with RLS-enforced visibility). Local mock
-(unchanged): Feed and Attendance. Next steps: a `profiles` table for real member
-names, moving Attendance onto Supabase, and push notifications.
+Real: accounts (Supabase Auth), groups/membership with roles + RLS, **votes**
+(role-gated create/cast/close with RLS-enforced visibility), and **attendance**
+(lazy missed-check-in, role-gated). Local mock (unchanged): Feed. Next steps: a
+`profiles` table for real member names, and push notifications (a scheduled job
+so the missed-check-in can reach people who never open the app).

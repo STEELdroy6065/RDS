@@ -48,7 +48,7 @@ export function GroupsProvider({ children }) {
     // 1) My memberships + the group each one points at (RLS scopes this to me).
     const { data: mine, error } = await supabase
       .from('memberships')
-      .select('role, group:groups(id, name, type, created_by, created_at)')
+      .select('role, group:groups(id, name, type, created_by, created_at, check_in_deadline)')
       .eq('user_id', user.id);
 
     if (error) {
@@ -90,6 +90,7 @@ export function GroupsProvider({ children }) {
       members: counts[m.group.id] || 1,
       emoji: emojiForType(m.group.type),
       kind: kindForType(m.group.type),
+      checkInDeadline: m.group.check_in_deadline || '09:00',
     }));
 
     setGroups(mapped);
