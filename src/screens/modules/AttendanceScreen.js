@@ -18,9 +18,9 @@ import {
 import { notify } from '../../lib/confirm';
 
 const KIND_META = {
-  submitted: { icon: 'checkmark-done', bg: colors.successSoft, fg: colors.success },
-  missed_self_study: { icon: 'book', bg: colors.primarySoft, fg: colors.primary },
-  missed_escalated: { icon: 'arrow-up-circle', bg: colors.accentSoft, fg: colors.accent },
+  submitted: { icon: 'checkmark-done-outline', bg: colors.successSoft, fg: colors.success },
+  missed_self_study: { icon: 'book-outline', bg: colors.primarySoft, fg: colors.primary },
+  missed_escalated: { icon: 'arrow-up-circle-outline', bg: colors.accentSoft, fg: colors.accent },
 };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

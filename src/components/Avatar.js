@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colorFromString, radius, type } from '../theme';
+import { colors, colorFromString, radius, type } from '../theme';
 
 function initials(name = '') {
   return name
@@ -11,11 +11,10 @@ function initials(name = '') {
     .join('');
 }
 
-// Deterministic colored initials avatar. Pass `emoji` to show a glyph instead.
-// Pass `ring` (a color) to draw a colored ring around it — used to signal the
-// user's role.
-export default function Avatar({ name, emoji, size = 44, ring }) {
-  const bg = colorFromString(name || emoji || '');
+// Colored circular initials avatar. Pass `emoji` for a glyph tile, `color` to
+// force the circle color (e.g. by role), or `ring` to draw a colored ring.
+export default function Avatar({ name, emoji, size = 44, ring, color }) {
+  const bg = color || colorFromString(name || emoji || '');
   const avatar = (
     <View
       style={[
@@ -24,9 +23,9 @@ export default function Avatar({ name, emoji, size = 44, ring }) {
           width: size,
           height: size,
           borderRadius: emoji ? radius.md : size / 2,
-          backgroundColor: emoji ? '#FFFFFF' : bg,
+          backgroundColor: emoji ? colors.surfaceAlt : bg,
           borderWidth: emoji ? 1 : 0,
-          borderColor: 'rgba(27,26,46,0.06)',
+          borderColor: colors.border,
         },
       ]}
     >

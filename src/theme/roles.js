@@ -1,26 +1,25 @@
-// Role is Synq's visual signature. Each role gets a bold, distinct color used
-// everywhere the user's standing shows up — group card stripes, avatar rings,
-// role badges. Shades chosen to be clearly different (gold / teal / indigo)
-// with readable soft+text pairings.
+// Role is Synq's visual signature and, on the dark theme, the main pop of
+// color. Vivid gold / teal / indigo that read strongly against the charcoal
+// canvas, each with a dark tinted "soft" panel and a bright text color.
 
 export const roleColors = {
   Admin: {
-    solid: '#C0871A', // warm amber / gold
-    soft: '#F7EACB',
-    text: '#835A0C',
-    ring: '#E0A63A',
+    solid: '#E0A93A', // vivid amber / gold
+    soft: '#332811',
+    text: '#F0C061',
+    ring: '#E0A93A',
   },
   Captain: {
-    solid: '#0E8C8C', // teal
-    soft: '#D3EFEF',
-    text: '#0A5C5C',
-    ring: '#16A6A6',
+    solid: '#19B5B5', // vivid teal
+    soft: '#0E2E2E',
+    text: '#40D4D4',
+    ring: '#19B5B5',
   },
   Member: {
-    solid: '#4A3DBB', // deep indigo
-    soft: '#E6E3F9',
-    text: '#362A8C',
-    ring: '#6355D8',
+    solid: '#7C6CF0', // vivid indigo
+    soft: '#232145',
+    text: '#A99CF7',
+    ring: '#7C6CF0',
   },
 };
 

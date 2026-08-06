@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Screen from '../components/Screen';
 import Card from '../components/Card';
 import Avatar from '../components/Avatar';
@@ -22,7 +21,6 @@ const SETTINGS = [
 ];
 
 export default function ProfileScreen({ navigation }) {
-  const insets = useSafeAreaInsets();
   useStatusBar('light');
   const { user, signOut } = useSession();
   const { groups } = useGroups();
@@ -48,62 +46,58 @@ export default function ProfileScreen({ navigation }) {
   }
 
   return (
-    <Screen topInset={false} style={styles.root}>
+    <Screen>
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Dark header with role-ringed avatar */}
-        <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.headerCenter}>
-            <Avatar name={name} size={76} ring={rc.ring} />
-            <Text style={styles.name}>{name}</Text>
-            {subtitle ? <Text style={styles.email}>{subtitle}</Text> : null}
-            {groups.length ? (
-              <RoleBadge role={myTopRole} solid style={styles.headerBadge} />
-            ) : null}
-          </View>
+        <Text style={styles.title}>Profile</Text>
+
+        {/* Identity */}
+        <View style={styles.identity}>
+          <Avatar name={name} size={80} ring={rc.ring} color={rc.solid} />
+          <Text style={styles.name}>{name}</Text>
+          {subtitle ? <Text style={styles.email}>{subtitle}</Text> : null}
+          {groups.length ? (
+            <RoleBadge role={myTopRole} solid style={styles.badge} />
+          ) : null}
         </View>
 
-        {/* Light sheet */}
-        <View style={styles.sheet}>
-          <View style={styles.statsCard}>
-            <Stat value={groups.length} label="Groups" />
-            <View style={styles.vDivider} />
-            <Stat value={0} label="Votes cast" />
-            <View style={styles.vDivider} />
-            <Stat value="—" label="Attendance" />
-          </View>
-
-          <SectionLabel style={styles.section}>Settings</SectionLabel>
-          <Card padded={false}>
-            {SETTINGS.map((s, i) => (
-              <Pressable
-                key={s.id}
-                onPress={() => onSettingPress(s.id)}
-                style={({ pressed }) => [
-                  styles.settingRow,
-                  i < SETTINGS.length - 1 && styles.settingBorder,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Ionicons
-                  name={s.icon}
-                  size={20}
-                  color={s.danger ? colors.accent : colors.inkSoft}
-                />
-                <Text style={[styles.settingLabel, s.danger && { color: colors.accent }]}>
-                  {s.label}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-              </Pressable>
-            ))}
-          </Card>
-
-          <Text style={styles.version}>Synq · v0.1.0</Text>
+        {/* Stats */}
+        <View style={styles.statsCard}>
+          <Stat value={groups.length} label="Groups" />
+          <View style={styles.vDivider} />
+          <Stat value={0} label="Votes cast" />
+          <View style={styles.vDivider} />
+          <Stat value="—" label="Attendance" />
         </View>
+
+        <SectionLabel style={styles.section}>Settings</SectionLabel>
+        <Card padded={false}>
+          {SETTINGS.map((s, i) => (
+            <Pressable
+              key={s.id}
+              onPress={() => onSettingPress(s.id)}
+              style={({ pressed }) => [
+                styles.settingRow,
+                i < SETTINGS.length - 1 && styles.settingBorder,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name={s.icon}
+                size={20}
+                color={s.danger ? colors.accent : colors.inkSoft}
+              />
+              <Text style={[styles.settingLabel, s.danger && { color: colors.accent }]}>
+                {s.label}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </Pressable>
+          ))}
+        </Card>
+
+        <Text style={styles.version}>Synq · v0.1.0</Text>
       </ScrollView>
     </Screen>
   );
@@ -119,48 +113,33 @@ function Stat({ value, label }) {
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: colors.ink },
-  scroll: { backgroundColor: colors.bg },
-  scrollContent: { paddingBottom: spacing.xxl },
-  header: {
-    backgroundColor: colors.ink,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl + spacing.xl,
-    alignItems: 'center',
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl,
   },
-  headerTitle: {
-    ...type.label,
-    color: 'rgba(255,255,255,0.5)',
-    alignSelf: 'flex-start',
+  title: {
+    ...type.display,
+    color: colors.ink,
     marginBottom: spacing.xl,
   },
-  headerCenter: { alignItems: 'center' },
-  name: { ...type.title, color: '#FFFFFF', marginTop: spacing.md },
-  email: { ...type.caption, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  headerBadge: { marginTop: spacing.md },
-  sheet: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -spacing.xl,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    minHeight: 400,
-  },
+  identity: { alignItems: 'center', marginBottom: spacing.xl },
+  name: { ...type.title, color: colors.ink, marginTop: spacing.md },
+  email: { ...type.caption, color: colors.muted, marginTop: 2 },
+  badge: { marginTop: spacing.md },
   statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    marginTop: -spacing.xxl - spacing.md,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xl,
     marginBottom: spacing.xl,
-    ...shadow.raised,
+    ...shadow.card,
   },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { ...type.title, fontSize: 24, color: colors.ink },
-  statLabel: { ...type.caption, color: colors.muted, marginTop: 2 },
-  vDivider: { width: 1, height: 30, backgroundColor: colors.divider },
+  statValue: { ...type.title, fontSize: 26, color: colors.ink },
+  statLabel: { ...type.caption, color: colors.muted, marginTop: 3 },
+  vDivider: { width: 1, height: 32, backgroundColor: colors.divider },
   section: { marginTop: spacing.xs },
   settingRow: {
     flexDirection: 'row',

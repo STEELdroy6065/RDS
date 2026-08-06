@@ -9,13 +9,13 @@ import { colors, spacing, radius, type } from '../theme';
 import { alerts } from '../data/mock';
 
 const KIND_META = {
-  vote: { icon: 'bar-chart', bg: colors.primarySoft, fg: colors.primary },
-  announcement: { icon: 'megaphone', bg: colors.accentSoft, fg: colors.accent },
-  attendance: { icon: 'checkmark-done', bg: colors.successSoft, fg: colors.success },
+  vote: { icon: 'bar-chart-outline', bg: colors.primarySoft, fg: colors.primary },
+  announcement: { icon: 'megaphone-outline', bg: colors.accentSoft, fg: colors.accent },
+  attendance: { icon: 'checkmark-done-outline', bg: colors.successSoft, fg: colors.success },
 };
 
 export default function AlertsScreen() {
-  useStatusBar('dark');
+  useStatusBar('light');
   const unread = alerts.filter((a) => a.unread).length;
 
   return (

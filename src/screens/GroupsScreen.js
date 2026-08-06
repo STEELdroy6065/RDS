@@ -9,7 +9,7 @@ import { useGroups } from '../state/groups';
 import { useStatusBar } from '../components/useStatusBar';
 
 export default function GroupsScreen({ navigation }) {
-  useStatusBar('dark');
+  useStatusBar('light');
   const { groups, loading } = useGroups();
   return (
     <Screen>

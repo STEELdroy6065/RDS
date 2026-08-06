@@ -1,49 +1,51 @@
-// Synq palette — a considered, restrained system.
-// Signature: indigo-violet primary + warm coral accent on a soft cool-neutral canvas.
+// Synq palette — dark theme.
+// Deep charcoal-navy canvas, subtly lighter panels, light text, with the
+// role-color system as the main pop of color (see roles.js).
 
 export const colors = {
   // Canvas & surfaces
-  bg: '#F5F4F8',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F1EFF8',
+  bg: '#121319', // deep charcoal-navy (not pure black)
+  surface: '#1C1D26', // card panels — just enough lift off the bg
+  surfaceAlt: '#262733', // inputs, segments, chips
 
   // Ink / text
-  ink: '#1B1A2E',
-  inkSoft: '#4A4860',
-  muted: '#8B8AA0',
+  ink: '#F4F4F8', // primary text (near-white)
+  inkSoft: '#C4C5D2', // secondary text
+  muted: '#8A8B9C', // captions / placeholders
   onPrimary: '#FFFFFF',
 
-  // Brand
-  primary: '#5646C4',
-  primaryDark: '#3E31A0',
-  primarySoft: '#ECE9FA',
+  // Brand (brightened to pop on dark)
+  primary: '#7C6CF0',
+  primaryDark: '#5B4BE1',
+  primarySoft: '#24223E', // dark indigo panel (badge/icon backdrop)
 
   // Accent
-  accent: '#FF6B57',
-  accentSoft: '#FFE7E2',
+  accent: '#FF7A66',
+  accentSoft: '#3A2420',
 
   // Semantic
-  success: '#1FA971',
-  successSoft: '#E2F5EC',
-  warning: '#E8A33D',
-  warningSoft: '#FBF0DC',
-  info: '#3D8BF0',
-  infoSoft: '#E4EFFD',
+  success: '#2FCB92',
+  successSoft: '#16302A',
+  warning: '#E9AE4B',
+  warningSoft: '#332811',
+  info: '#4F9DF7',
+  infoSoft: '#152A40',
 
-  // Lines & shadow
-  border: '#E7E4F0',
-  divider: '#EFEDF5',
-  shadow: '#1B1A2E',
+  // Lines & shadow (subtle, no harsh borders)
+  border: '#2A2B36',
+  divider: '#24252F',
+  shadow: '#000000',
 };
 
-// A small, harmonious set used to color group/member avatars deterministically.
+// Vivid avatar colors, keyed to the role palette so initials read as colorful
+// on the dark background.
 export const avatarPalette = [
-  '#5646C4',
-  '#FF6B57',
-  '#1FA971',
-  '#3D8BF0',
-  '#E8A33D',
-  '#B5479A',
+  '#7C6CF0', // indigo
+  '#19B5B5', // teal
+  '#E0A93A', // amber
+  '#4F9DF7', // blue
+  '#E8557A', // pink
+  '#2FCB92', // green
 ];
 
 export function colorFromString(str = '') {

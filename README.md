@@ -233,22 +233,26 @@ Basics for real users, in the existing visual style:
 
 ## Design
 
-The visual identity is built around Synq's core idea — **the app knows your role
-and routes accordingly** — so **role is the signature**:
+A polished **dark theme** with the **role-color system** as the main pop of
+color — built around Synq's core idea that the app knows your role and routes
+accordingly.
 
-- **Role colors** (`src/theme/roles.js`) — each role gets a bold, distinct color:
-  **Admin/Teacher gold**, **Captain teal**, **Member deep indigo**. They appear
-  consistently as a group card's left stripe, a ring around avatars, and role
-  badges (`RoleBadge`) — no more plain gray pills.
-- **Bold headers** — Home and Profile lead with a dark header zone (greeting /
-  role-ringed avatar) and a light sheet that rises over it, with the large,
-  confident stat numbers on an elevated card.
-- **The pulse** (`src/components/Pulse.js`) — a small dot with an expanding,
-  fading ring, like a signal reaching someone. Used consistently wherever
-  something signals an update: new alerts, a live vote, an attendance cascade.
-- **Foundations** — indigo-violet primary (`#5646C4`) + warm coral accent on a
-  soft canvas; a deliberate system-font scale; spacing/radius/shadow tokens
-  centralized in `src/theme`.
+- **Dark base** (`src/theme/colors.js`) — a deep charcoal-navy canvas (`#121319`,
+  not pure black), subtly lighter card panels (`#1C1D26`), light text, and soft
+  low-contrast dividers instead of harsh borders.
+- **Role colors** (`src/theme/roles.js`) — vivid **Admin/Teacher gold**,
+  **Captain teal**, **Member indigo** that pop against the dark: group card left
+  stripes, avatar rings, role-colored initials, and role badges (`RoleBadge`).
+- **Shape & spacing** — soft, rounded, pill-shaped elements (generous `radius`
+  tokens) with roomy spacing.
+- **The pulse** (`src/components/Pulse.js`) — a dot with an expanding, fading
+  ring, like a signal reaching someone. Tuned for the dark background and used
+  wherever something signals an update: new alerts, a live vote, an attendance
+  cascade.
+- **Icons** — a single family (Ionicons), line/outline style on the primary
+  surfaces for a clean, consistent look.
+- **Foundations** — brightened indigo-violet primary (`#7C6CF0`) + warm coral
+  accent; a deliberate system-font scale; tokens centralized in `src/theme`.
 
 ## Status
 
