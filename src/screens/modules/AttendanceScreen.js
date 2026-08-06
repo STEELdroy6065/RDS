@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
+import Pulse from '../../components/Pulse';
 import { colors, spacing, radius, type, shadow } from '../../theme';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
@@ -199,7 +200,10 @@ function CaptainCascade({ groupName, onResolve }) {
           <Ionicons name="alert" size={20} color={colors.onPrimary} />
         </View>
         <View style={styles.cascadeHeadBody}>
-          <Text style={styles.cascadeTag}>MISSED CHECK-IN</Text>
+          <View style={styles.cascadeTagRow}>
+            <Pulse color={colors.accent} size={7} />
+            <Text style={styles.cascadeTag}>MISSED CHECK-IN</Text>
+          </View>
           <Text style={styles.cascadeTitle}>
             Today’s check-in was missed — {groupName}
           </Text>
@@ -331,6 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cascadeHeadBody: { flex: 1, marginLeft: spacing.md },
+  cascadeTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cascadeTag: { ...type.label, fontSize: 10, color: colors.accent },
   cascadeTitle: { ...type.bodyStrong, color: colors.ink, marginTop: 2 },
   cascadeSub: {

@@ -6,8 +6,10 @@ import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
 import { colors, spacing, radius, type, shadow } from '../theme';
 import { useGroups } from '../state/groups';
+import { useStatusBar } from '../components/useStatusBar';
 
 export default function GroupsScreen({ navigation }) {
+  useStatusBar('dark');
   const { groups, loading } = useGroups();
   return (
     <Screen>

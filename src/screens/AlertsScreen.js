@@ -3,6 +3,8 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
 import Card from '../components/Card';
+import Pulse from '../components/Pulse';
+import { useStatusBar } from '../components/useStatusBar';
 import { colors, spacing, radius, type } from '../theme';
 import { alerts } from '../data/mock';
 
@@ -13,6 +15,7 @@ const KIND_META = {
 };
 
 export default function AlertsScreen() {
+  useStatusBar('dark');
   const unread = alerts.filter((a) => a.unread).length;
 
   return (
@@ -25,6 +28,7 @@ export default function AlertsScreen() {
           <Text style={styles.title}>Alerts</Text>
           {unread > 0 ? (
             <View style={styles.badge}>
+              <Pulse color={colors.onPrimary} size={7} />
               <Text style={styles.badgeText}>{unread} new</Text>
             </View>
           ) : null}
@@ -43,7 +47,9 @@ export default function AlertsScreen() {
                     <Text style={styles.itemTitle} numberOfLines={1}>
                       {a.title}
                     </Text>
-                    {a.unread ? <View style={styles.unreadDot} /> : null}
+                    {a.unread ? (
+                      <Pulse color={colors.accent} size={7} style={styles.unreadPulse} />
+                    ) : null}
                   </View>
                   <Text style={styles.itemBody} numberOfLines={2}>
                     {a.body}
@@ -75,11 +81,14 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginLeft: spacing.md,
     backgroundColor: colors.accent,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
   badgeText: {
     ...type.label,
@@ -112,11 +121,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     flexShrink: 1,
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
+  unreadPulse: {
     marginLeft: spacing.sm,
   },
   itemBody: {

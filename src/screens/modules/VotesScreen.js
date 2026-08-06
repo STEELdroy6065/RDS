@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
+import Pulse from '../../components/Pulse';
 import { colors, spacing, radius, type, shadow } from '../../theme';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
@@ -136,7 +137,11 @@ function VoteListCard({ vote, userId, onPress }) {
     <Card onPress={onPress} style={styles.voteCard}>
       <View style={styles.voteTop}>
         <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-          <Ionicons name={tone.icon} size={11} color={tone.fg} />
+          {label === 'Live' ? (
+            <Pulse color={tone.fg} size={7} />
+          ) : (
+            <Ionicons name={tone.icon} size={11} color={tone.fg} />
+          )}
           <Text style={[styles.statusText, { color: tone.fg }]}>
             {label.toUpperCase()}
           </Text>

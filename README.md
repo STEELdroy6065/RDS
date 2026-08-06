@@ -233,13 +233,22 @@ Basics for real users, in the existing visual style:
 
 ## Design
 
-A restrained, product-minded system rather than a generic dashboard template:
+The visual identity is built around Synq's core idea — **the app knows your role
+and routes accordingly** — so **role is the signature**:
 
-- **Palette** — an indigo-violet primary (`#5646C4`) with a warm coral accent
-  (`#FF6B57`) on a soft cool-neutral canvas; soft semantic tints for badges.
-- **Typography** — a deliberate system-font scale with tight display headings and
-  spaced uppercase labels (offline-friendly, no font downloads).
-- **Tokens** — spacing, radius, and shadow are centralized in `src/theme`.
+- **Role colors** (`src/theme/roles.js`) — each role gets a bold, distinct color:
+  **Admin/Teacher gold**, **Captain teal**, **Member deep indigo**. They appear
+  consistently as a group card's left stripe, a ring around avatars, and role
+  badges (`RoleBadge`) — no more plain gray pills.
+- **Bold headers** — Home and Profile lead with a dark header zone (greeting /
+  role-ringed avatar) and a light sheet that rises over it, with the large,
+  confident stat numbers on an elevated card.
+- **The pulse** (`src/components/Pulse.js`) — a small dot with an expanding,
+  fading ring, like a signal reaching someone. Used consistently wherever
+  something signals an update: new alerts, a live vote, an attendance cascade.
+- **Foundations** — indigo-violet primary (`#5646C4`) + warm coral accent on a
+  soft canvas; a deliberate system-font scale; spacing/radius/shadow tokens
+  centralized in `src/theme`.
 
 ## Status
 

@@ -4,8 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
+import RoleBadge from '../components/RoleBadge';
 import Header from '../components/Header';
-import { colors, spacing, radius, type, shadow } from '../theme';
+import { colors, spacing, radius, type, shadow, roleTheme } from '../theme';
 import { useGroups } from '../state/groups';
 
 const MODULES = [
@@ -69,13 +70,10 @@ export default function GroupDetailScreen({ route, navigation }) {
       >
         {/* Group header */}
         <View style={styles.groupHead}>
-          <Avatar emoji={group.emoji} name={group.name} size={72} />
+          <Avatar emoji={group.emoji} name={group.name} size={72} ring={roleTheme(group.role).ring} />
           <Text style={styles.groupName}>{group.name}</Text>
           <View style={styles.metaRow}>
-            <Badge
-              label={group.role}
-              tone={group.role === 'Member' ? 'neutral' : 'primary'}
-            />
+            <RoleBadge role={group.role} />
             <Badge label={group.kind} tone="neutral" style={{ marginLeft: 8 }} />
             <View style={styles.dot} />
             <Text style={styles.meta}>{group.members} members</Text>

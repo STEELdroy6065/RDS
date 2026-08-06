@@ -1,5 +1,6 @@
 import { colors, avatarPalette, colorFromString } from './colors';
 import { type } from './typography';
+import { roleColors, roleTheme, topRole } from './roles';
 
 export const spacing = {
   xs: 4,
@@ -35,3 +36,4 @@ export const shadow = {
 };
 
 export { colors, avatarPalette, colorFromString, type };
+export { roleColors, roleTheme, topRole };

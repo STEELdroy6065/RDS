@@ -12,9 +12,11 @@ function initials(name = '') {
 }
 
 // Deterministic colored initials avatar. Pass `emoji` to show a glyph instead.
-export default function Avatar({ name, emoji, size = 44 }) {
+// Pass `ring` (a color) to draw a colored ring around it — used to signal the
+// user's role.
+export default function Avatar({ name, emoji, size = 44, ring }) {
   const bg = colorFromString(name || emoji || '');
-  return (
+  const avatar = (
     <View
       style={[
         styles.wrap,
@@ -31,10 +33,27 @@ export default function Avatar({ name, emoji, size = 44 }) {
       {emoji ? (
         <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
       ) : (
-        <Text style={[styles.text, { fontSize: size * 0.36 }]}>
-          {initials(name)}
-        </Text>
+        <Text style={[styles.text, { fontSize: size * 0.36 }]}>{initials(name)}</Text>
       )}
+    </View>
+  );
+
+  if (!ring) return avatar;
+
+  const pad = Math.max(3, Math.round(size * 0.09));
+  const outer = emoji ? radius.md + pad : (size + pad * 2) / 2;
+  return (
+    <View
+      style={{
+        padding: pad,
+        borderRadius: outer,
+        borderWidth: 2,
+        borderColor: ring,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {avatar}
     </View>
   );
 }

@@ -1,9 +1,12 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Screen from '../components/Screen';
 import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
-import { colors, spacing, type } from '../theme';
+import RoleBadge from '../components/RoleBadge';
+import { useStatusBar } from '../components/useStatusBar';
+import { colors, spacing, radius, type, shadow, topRole } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 
@@ -15,45 +18,61 @@ function greeting() {
 }
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  useStatusBar('light');
   const { user } = useSession();
   const { groups } = useGroups();
   const firstName = user && user.name ? user.name.split(' ')[0] : 'there';
+  const myTopRole = groups.length ? topRole(groups.map((g) => g.role)) : null;
 
   return (
-    <Screen>
+    <Screen topInset={false} style={styles.root}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.brand}>Synq</Text>
-        <Text style={styles.greeting}>{greeting()},</Text>
-        <Text style={styles.name}>{firstName} 👋</Text>
-
-        <View style={styles.summaryRow}>
-          <Summary value={groups.length} label="Groups" />
-          <View style={styles.vDivider} />
-          <Summary value={0} label="Votes cast" />
-          <View style={styles.vDivider} />
-          <Summary value="—" label="Attendance" />
+        {/* Bold dark header */}
+        <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+          <Text style={styles.brand}>SYNQ</Text>
+          <Text style={styles.greeting}>{greeting()},</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{firstName}</Text>
+            <Text style={styles.wave}> 👋</Text>
+          </View>
+          {myTopRole ? (
+            <RoleBadge role={myTopRole} solid style={styles.headerBadge} />
+          ) : null}
         </View>
 
-        <SectionLabel style={styles.section}>Your groups</SectionLabel>
-        {groups.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No groups yet</Text>
-            <Text style={styles.emptySub}>
-              Head to the Groups tab to create or join your first group.
-            </Text>
+        {/* Light sheet rising over the header */}
+        <View style={styles.sheet}>
+          <View style={styles.statsCard}>
+            <Summary value={groups.length} label="Groups" />
+            <View style={styles.vDivider} />
+            <Summary value={0} label="Votes cast" />
+            <View style={styles.vDivider} />
+            <Summary value="—" label="Attendance" />
           </View>
-        ) : (
-          groups.map((g) => (
-            <GroupCard
-              key={g.id}
-              group={g}
-              onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
-            />
-          ))
-        )}
+
+          <SectionLabel style={styles.section}>Your groups</SectionLabel>
+          {groups.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No groups yet</Text>
+              <Text style={styles.emptySub}>
+                Head to the Groups tab to create or join your first group.
+              </Text>
+            </View>
+          ) : (
+            groups.map((g) => (
+              <GroupCard
+                key={g.id}
+                group={g}
+                onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
+              />
+            ))
+          )}
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -69,61 +88,59 @@ function Summary({ value, label }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
+  root: { backgroundColor: colors.ink },
+  scroll: { backgroundColor: colors.bg },
+  scrollContent: { paddingBottom: spacing.xxl },
+  header: {
+    backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.xl,
   },
   brand: {
     ...type.label,
-    color: colors.primary,
+    color: 'rgba(255,255,255,0.5)',
     marginBottom: spacing.lg,
   },
   greeting: {
     ...type.title,
-    color: colors.muted,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '600',
   },
+  nameRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 },
   name: {
     ...type.display,
-    color: colors.ink,
-    marginTop: 2,
+    fontSize: 34,
+    color: '#FFFFFF',
   },
-  summaryRow: {
+  wave: { ...type.display, fontSize: 28 },
+  headerBadge: { marginTop: spacing.lg },
+  sheet: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    minHeight: 400,
+  },
+  statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.md,
     paddingVertical: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: -spacing.xxl - spacing.md,
     marginBottom: spacing.xl,
+    ...shadow.raised,
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryValue: {
-    ...type.title,
-    color: colors.ink,
-  },
-  summaryLabel: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  vDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.divider,
-  },
-  section: {
-    marginTop: spacing.xs,
-  },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryValue: { ...type.title, fontSize: 24, color: colors.ink },
+  summaryLabel: { ...type.caption, color: colors.muted, marginTop: 2 },
+  vDivider: { width: 1, height: 30, backgroundColor: colors.divider },
+  section: { marginTop: spacing.xs },
   empty: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xl,

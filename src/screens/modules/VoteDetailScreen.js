@@ -5,6 +5,7 @@ import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
 import Header from '../../components/Header';
+import Pulse from '../../components/Pulse';
 import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
 import { useVotes } from '../../state/votes';
@@ -184,7 +185,11 @@ function StatusRow({ label, total, seeResults }) {
   return (
     <View style={styles.statusRow}>
       <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-        <Ionicons name={tone.icon} size={12} color={tone.fg} />
+        {label === 'Live' ? (
+          <Pulse color={tone.fg} size={8} />
+        ) : (
+          <Ionicons name={tone.icon} size={12} color={tone.fg} />
+        )}
         <Text style={[styles.statusText, { color: tone.fg }]}>
           {label.toUpperCase()}
         </Text>
