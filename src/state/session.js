@@ -5,13 +5,17 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 
 // Real auth session backed by Supabase. Exposes the current user plus the
-// sign-up / sign-in / sign-out calls. Screens that only need identity keep
-// reading `user` exactly as before.
+// sign-up / sign-in / sign-out / password-reset calls. Also handles the
+// password-recovery deep link that Supabase emails back into the app.
 
 const SessionContext = createContext(null);
+
+// Where Supabase should send the user after they click the reset email.
+export const RESET_REDIRECT = Linking.createURL('reset-password');
 
 function toUser(session) {
   if (!session || !session.user) return null;
@@ -24,9 +28,30 @@ function toUser(session) {
   };
 }
 
+// Pull auth params out of a deep link's query string and/or hash fragment.
+function authParamsFromUrl(url) {
+  const out = {};
+  if (!url) return out;
+  const grab = (str) => {
+    if (!str) return;
+    str.split('&').forEach((pair) => {
+      const [k, v] = pair.split('=');
+      if (k) out[decodeURIComponent(k)] = decodeURIComponent(v || '');
+    });
+  };
+  const hashIndex = url.indexOf('#');
+  const queryIndex = url.indexOf('?');
+  if (queryIndex !== -1) {
+    grab(url.substring(queryIndex + 1, hashIndex === -1 ? undefined : hashIndex));
+  }
+  if (hashIndex !== -1) grab(url.substring(hashIndex + 1));
+  return out;
+}
+
 export function SessionProvider({ children }) {
   const [session, setSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -37,13 +62,38 @@ export function SessionProvider({ children }) {
       setInitializing(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
     });
+
+    // Handle the recovery link (fresh launch + while running).
+    const handleUrl = async (url) => {
+      if (!url || url.indexOf('reset-password') === -1) return;
+      const p = authParamsFromUrl(url);
+      try {
+        if (p.access_token && p.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: p.access_token,
+            refresh_token: p.refresh_token,
+          });
+        } else if (p.code) {
+          await supabase.auth.exchangeCodeForSession(p.code);
+        }
+      } catch (e) {
+        // ignore — the Set-new-password screen still lets them proceed if a
+        // session was established, or shows an error if not.
+      }
+      setPasswordRecovery(true);
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const linkSub = Linking.addEventListener('url', (e) => handleUrl(e.url));
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
+      linkSub.remove();
     };
   }, []);
 
@@ -52,8 +102,7 @@ export function SessionProvider({ children }) {
       session,
       user: toUser(session),
       initializing,
-      // Returns the raw Supabase result { data, error } so callers can surface
-      // precise messages.
+      passwordRecovery,
       signUp: ({ name, email, password }) =>
         supabase.auth.signUp({
           email: email.trim(),
@@ -63,8 +112,17 @@ export function SessionProvider({ children }) {
       signIn: ({ email, password }) =>
         supabase.auth.signInWithPassword({ email: email.trim(), password }),
       signOut: () => supabase.auth.signOut(),
+      // Email a password-reset link back into the app.
+      resetPassword: (email) =>
+        supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: RESET_REDIRECT,
+        }),
+      // Set the new password (during a recovery session).
+      updatePassword: (password) => supabase.auth.updateUser({ password }),
+      // Leave the recovery flow once the password is set (or cancelled).
+      endPasswordRecovery: () => setPasswordRecovery(false),
     }),
-    [session, initializing]
+    [session, initializing, passwordRecovery]
   );
 
   return (

@@ -36,8 +36,15 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 2. [`supabase/votes.sql`](supabase/votes.sql) — `votes`, `vote_options`, `vote_ballots` tables, RLS, and helper functions.
 3. [`supabase/attendance.sql`](supabase/attendance.sql) — `attendance_records`, `attendance_entries`, a per-group check-in deadline column, RLS, and helpers.
 4. [`supabase/feed.sql`](supabase/feed.sql) — `posts` table and RLS.
+5. [`supabase/reports.sql`](supabase/reports.sql) — `post_reports` table, RLS, and a post-delete (moderation) policy.
 
 Each is idempotent (safe to re-run).
+
+> **Password reset:** for the "Forgot password" deep link to return into the app,
+> add the app's redirect URL to Supabase → **Authentication → URL Configuration →
+> Redirect URLs** (e.g. your web preview origin with `/reset-password`, and the
+> Expo dev URL). Reset behavior varies by environment (web / Expo Go / a built
+> app); the screens and calls are wired regardless.
 
 > For quick testing, you may want to disable email confirmation:
 > dashboard → Authentication → Providers → Email → turn off "Confirm email".
@@ -129,14 +136,18 @@ src/
       SplashScreen.js
       WelcomeScreen.js
       AuthScreen.js
+      ForgotPasswordScreen.js
+      SetNewPasswordScreen.js
+    PrivacyScreen.js
     HomeScreen.js
     GroupsScreen.js
     AlertsScreen.js
     ProfileScreen.js
     GroupDetailScreen.js
     modules/
-      FeedScreen.js         Supabase posts (newest first)
+      FeedScreen.js         Supabase posts (newest first) + report action
       NewPostScreen.js      Create a post (type + text)
+      ReportedPostsScreen.js  Admin/Captain moderation view
       VotesScreen.js        List of a group's votes + gated "New vote"
       VoteDetailScreen.js   Named results, live/hidden logic, close action
       NewVoteScreen.js      Create-vote form (Captain/Admin only)
@@ -162,6 +173,7 @@ supabase/
   votes.sql                Votes tables + RLS + helper functions
   attendance.sql           Attendance tables + deadline column + RLS
   feed.sql                 Posts table + RLS
+  reports.sql              Post reports table + RLS + moderation delete
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -203,6 +215,21 @@ posting to members.
 
 > There is no `profiles` table yet, so names are denormalized onto rows at write
 > time; rows created by others before that exists show "Group member".
+
+## Safety & trust
+
+Basics for real users, in the existing visual style:
+
+- **Password recovery** — a "Forgot password?" link on log in emails a Supabase
+  reset link (`resetPasswordForEmail`); the app handles the deep link (via
+  `expo-linking`) and lands on a **Set new password** screen (`updateUser`).
+- **Content reporting & moderation** — every feed post has a **Report** action
+  (optional reason → `post_reports`). A group's **Admin/Captain** gets a
+  **Reported posts** view and can **Remove post** (RLS-gated delete). See
+  `supabase/reports.sql`.
+- **Privacy notice** — a plain-language `PrivacyScreen` listing what's collected
+  (name, email, memberships, posts, votes, attendance) and that it's used only
+  to run the app. Linked from Profile and shown as a consent line on sign-up.
 
 ## Design
 

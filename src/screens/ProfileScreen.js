@@ -18,7 +18,7 @@ const SETTINGS = [
   { id: 's5', icon: 'log-out-outline', label: 'Sign out', danger: true },
 ];
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, signOut } = useSession();
   const { groups } = useGroups();
 
@@ -33,6 +33,11 @@ export default function ProfileScreen() {
       destructive: true,
       onConfirm: () => signOut(),
     });
+  }
+
+  function onSettingPress(id) {
+    if (id === 's2') navigation.navigate('PrivacyNotice');
+    else if (id === 's5') confirmSignOut();
   }
 
   return (
@@ -66,7 +71,7 @@ export default function ProfileScreen() {
           {SETTINGS.map((s, i) => (
             <Pressable
               key={s.id}
-              onPress={s.id === 's5' ? confirmSignOut : undefined}
+              onPress={() => onSettingPress(s.id)}
               style={({ pressed }) => [
                 styles.settingRow,
                 i < SETTINGS.length - 1 && styles.settingBorder,

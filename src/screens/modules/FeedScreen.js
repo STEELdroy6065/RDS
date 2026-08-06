@@ -1,5 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Modal,
+  TextInput,
+  RefreshControl,
+  StyleSheet,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
@@ -9,6 +18,9 @@ import Badge from '../../components/Badge';
 import Header from '../../components/Header';
 import { colors, spacing, radius, type, shadow } from '../../theme';
 import { supabase } from '../../lib/supabase';
+import { useSession } from '../../state/session';
+import { useGroups } from '../../state/groups';
+import { notify } from '../../lib/confirm';
 
 const TYPE_TONE = {
   Announcement: 'accent',
@@ -31,8 +43,18 @@ function relTime(iso) {
 
 export default function FeedScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
+  const { user } = useSession();
+  const { roleForGroup } = useGroups();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Report modal state.
+  const [reportPost, setReportPost] = useState(null);
+  const [reason, setReason] = useState('');
+  const [reporting, setReporting] = useState(false);
+
+  const role = roleForGroup(groupId);
+  const isModerator = role === 'Admin' || role === 'Captain';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,9 +73,46 @@ export default function FeedScreen({ route, navigation }) {
     }, [load])
   );
 
+  function openReport(post) {
+    setReportPost(post);
+    setReason('');
+  }
+
+  async function submitReport() {
+    if (!reportPost || reporting) return;
+    setReporting(true);
+    const { error } = await supabase.from('post_reports').insert({
+      post_id: reportPost.id,
+      reported_by: user.id,
+      reason: reason.trim() || null,
+    });
+    setReporting(false);
+    setReportPost(null);
+    if (error) {
+      notify({ title: 'Could not send report', message: error.message });
+    } else {
+      notify({ title: 'Thanks for the report', message: 'A group Admin or Captain will review it.' });
+    }
+  }
+
   return (
     <Screen>
-      <Header title="Feed" subtitle={groupName} onBack={() => navigation.goBack()} />
+      <Header
+        title="Feed"
+        subtitle={groupName}
+        onBack={() => navigation.goBack()}
+        right={
+          isModerator ? (
+            <Pressable
+              onPress={() => navigation.navigate('ReportedPosts', { groupId, groupName })}
+              hitSlop={10}
+              style={({ pressed }) => [styles.modBtn, pressed && styles.pressed]}
+            >
+              <Ionicons name="flag" size={18} color={colors.accent} />
+            </Pressable>
+          ) : null
+        }
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -61,7 +120,6 @@ export default function FeedScreen({ route, navigation }) {
           <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />
         }
       >
-        {/* New post — any member can post */}
         <Pressable
           onPress={() => navigation.navigate('NewPost', { groupId, groupName })}
           style={({ pressed }) => [styles.newBtn, pressed && styles.pressed]}
@@ -78,9 +136,7 @@ export default function FeedScreen({ route, navigation }) {
 
         {posts.length === 0 ? (
           <Card style={styles.empty}>
-            <Text style={styles.emptyTitle}>
-              {loading ? 'Loading…' : 'No posts yet'}
-            </Text>
+            <Text style={styles.emptyTitle}>{loading ? 'Loading…' : 'No posts yet'}</Text>
             {!loading ? (
               <Text style={styles.emptySub}>Be the first to post in this group.</Text>
             ) : null}
@@ -95,20 +151,78 @@ export default function FeedScreen({ route, navigation }) {
                   <Text style={styles.time}>{relTime(p.created_at)}</Text>
                 </View>
                 <Badge label={p.type} tone={TYPE_TONE[p.type] || 'neutral'} />
+                <Pressable
+                  onPress={() => openReport(p)}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.moreBtn, pressed && styles.pressed]}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.muted} />
+                </Pressable>
               </View>
               <Text style={styles.text}>{p.text}</Text>
             </Card>
           ))
         )}
       </ScrollView>
+
+      {/* Report modal */}
+      <Modal
+        visible={!!reportPost}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReportPost(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setReportPost(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetIcon}>
+              <Ionicons name="flag" size={22} color={colors.accent} />
+            </View>
+            <Text style={styles.sheetTitle}>Report this post</Text>
+            <Text style={styles.sheetSub}>
+              Let the group’s Admin or Captain know. You can add a short reason
+              (optional).
+            </Text>
+            <TextInput
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Reason (optional)"
+              placeholderTextColor={colors.muted}
+              style={styles.reasonInput}
+              multiline
+            />
+            <View style={styles.sheetActions}>
+              <Pressable
+                onPress={() => setReportPost(null)}
+                style={({ pressed }) => [styles.sheetBtn, styles.sheetCancel, pressed && styles.pressed]}
+              >
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={submitReport}
+                disabled={reporting}
+                style={({ pressed }) => [styles.sheetBtn, styles.sheetReport, pressed && styles.pressed]}
+              >
+                <Text style={styles.sheetReportText}>
+                  {reporting ? 'Sending…' : 'Report'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  modBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
   },
   newBtn: {
     flexDirection: 'row',
@@ -137,30 +251,63 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: spacing.xl },
   emptyTitle: { ...type.heading, color: colors.ink },
   emptySub: { ...type.caption, color: colors.muted, marginTop: 4, textAlign: 'center' },
-  post: {
-    marginBottom: spacing.md,
-  },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  headBody: {
+  post: { marginBottom: spacing.md },
+  head: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  headBody: { flex: 1, marginLeft: spacing.md },
+  author: { ...type.bodyStrong, color: colors.ink },
+  time: { ...type.caption, color: colors.muted, marginTop: 1 },
+  moreBtn: { paddingLeft: 6, marginLeft: 6 },
+  text: { ...type.body, color: colors.inkSoft, lineHeight: 21 },
+
+  backdrop: {
     flex: 1,
-    marginLeft: spacing.md,
+    backgroundColor: 'rgba(27,26,46,0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
   },
-  author: {
-    ...type.bodyStrong,
-    color: colors.ink,
+  sheet: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
   },
-  time: {
+  sheetIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  sheetTitle: { ...type.title, fontSize: 19, color: colors.ink },
+  sheetSub: {
     ...type.caption,
-    color: colors.muted,
-    marginTop: 1,
-  },
-  text: {
-    ...type.body,
     color: colors.inkSoft,
-    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 18,
   },
+  reasonInput: {
+    ...type.body,
+    color: colors.ink,
+    alignSelf: 'stretch',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    minHeight: 64,
+    textAlignVertical: 'top',
+    marginTop: spacing.lg,
+  },
+  sheetActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, alignSelf: 'stretch' },
+  sheetBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  sheetCancel: { backgroundColor: colors.surfaceAlt },
+  sheetCancelText: { ...type.bodyStrong, color: colors.inkSoft },
+  sheetReport: { backgroundColor: colors.accent },
+  sheetReportText: { ...type.bodyStrong, color: colors.onPrimary },
 });

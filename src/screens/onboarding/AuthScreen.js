@@ -143,6 +143,16 @@ export default function AuthScreen({ navigation }) {
             />
           </View>
 
+          {isLogin ? (
+            <Pressable
+              onPress={() => navigation.navigate('ForgotPassword')}
+              hitSlop={6}
+              style={styles.forgot}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </Pressable>
+          ) : null}
+
           {error ? (
             <View style={styles.banner}>
               <Ionicons name="alert-circle" size={16} color={colors.accent} />
@@ -182,6 +192,18 @@ export default function AuthScreen({ navigation }) {
               </>
             )}
           </Pressable>
+
+          {!isLogin ? (
+            <Text style={styles.consent}>
+              By continuing you agree to how your data is used —{' '}
+              <Text
+                style={styles.consentLink}
+                onPress={() => navigation.navigate('PrivacyNotice')}
+              >
+                view
+              </Text>
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.footer}>
@@ -269,6 +291,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     marginLeft: spacing.md,
   },
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.md,
+    paddingVertical: 2,
+  },
+  forgotText: { ...type.bodyStrong, fontSize: 13, color: colors.primary },
+  consent: {
+    ...type.caption,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    lineHeight: 18,
+  },
+  consentLink: { color: colors.primary, fontWeight: '700' },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
