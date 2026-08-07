@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, radius, type, shadow } from '../theme';
+import { useNotifications } from '../state/notifications';
 
 // Floating pill-shaped bottom navigation (rounded ends, margin from edges).
 const ICONS = {
@@ -13,6 +14,7 @@ const ICONS = {
 
 export default function FloatingTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotifications();
 
   return (
     <View
@@ -40,11 +42,20 @@ export default function FloatingTabBar({ state, navigation }) {
               style={styles.item}
               hitSlop={8}
             >
-              <Ionicons
-                name={focused ? active : inactive}
-                size={22}
-                color={focused ? colors.primary : colors.muted}
-              />
+              <View>
+                <Ionicons
+                  name={focused ? active : inactive}
+                  size={22}
+                  color={focused ? colors.primary : colors.muted}
+                />
+                {route.name === 'Alerts' && unreadCount > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={[styles.label, { color: focused ? colors.primary : colors.muted }]}>
                 {route.name}
               </Text>
@@ -86,4 +97,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.3,
   },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  badgeText: { ...type.label, fontSize: 9, color: colors.onPrimary },
 });
+

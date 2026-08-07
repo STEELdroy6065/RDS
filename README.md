@@ -37,6 +37,7 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 3. [`supabase/attendance.sql`](supabase/attendance.sql) — `attendance_records`, `attendance_entries`, a per-group check-in deadline column, RLS, and helpers.
 4. [`supabase/feed.sql`](supabase/feed.sql) — `posts` table and RLS.
 5. [`supabase/reports.sql`](supabase/reports.sql) — `post_reports` table, RLS, and a post-delete (moderation) policy.
+6. [`supabase/notifications.sql`](supabase/notifications.sql) — `notifications` table, RLS, and the triggers/function that populate it.
 
 Each is idempotent (safe to re-run).
 
@@ -75,6 +76,7 @@ Alerts / Profile.
 | **Sign up / Log in** | `AuthScreen` | **Real Supabase email + password auth**, with validation and error messages. |
 | **Group rail** | `GroupRail` | Always-visible vertical rail of circular group icons, ringed by your role; tap to jump into a group, `+` to create/join. |
 | **Home** | `HomeScreen` | Greeting, quick stats, and the user's real groups. |
+| **Alerts** | `AlertsScreen` | Real in-app notifications (Supabase); unread dot + tab badge; tap marks read and jumps to the vote/feed/attendance/reports. |
 | **New group** | `NewGroupScreen` | Create (name + template) or Join (**scan a QR** / enter a code); both add to the live groups and open the group. |
 | **Scan group** | `ScanGroupScreen` | Camera QR scanner (`expo-camera`) — scan a group's QR to join. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
@@ -180,6 +182,7 @@ supabase/
   attendance.sql           Attendance tables + deadline column + RLS
   feed.sql                 Posts table + RLS
   reports.sql              Post reports table + RLS + moderation delete
+  notifications.sql        Notifications table + RLS + triggers/function
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -220,6 +223,14 @@ submit, only the Captain can resolve a miss, all members can read.
 **Also real: Feed** (`supabase/feed.sql`) — a `posts` table; any group member
 can post (Announcement / Resource / Discussion), and RLS limits reading and
 posting to members.
+
+**Also real: Notifications** (`supabase/notifications.sql`) — a `notifications`
+table populated **server-side by triggers**: a new vote or a new Announcement
+notifies every group member; a report notifies the group's Admins/Captains. The
+missed check-in (computed on read, no cron) is raised via a `SECURITY DEFINER`
+function the app calls when it observes the miss, deduped to once per group per
+day. RLS: you only see/update your own notifications; inserts come only from the
+triggers/function. The Alerts screen and the tab's unread badge read from it.
 
 > There is no `profiles` table yet, so names are denormalized onto rows at write
 > time; rows created by others before that exists show "Group member".

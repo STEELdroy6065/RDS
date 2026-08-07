@@ -74,29 +74,5 @@ export const membersByGroup = {
   ],
 };
 
-export const alerts = [
-  {
-    id: 'a1',
-    kind: 'vote',
-    title: 'New poll in Lincoln HS Soccer',
-    body: 'Coach Rivera asked: What time works best for Saturday practice?',
-    time: '12m',
-    unread: true,
-  },
-  {
-    id: 'a2',
-    kind: 'announcement',
-    title: 'Announcement · Robotics Club',
-    body: 'Regional qualifier registration closes Friday.',
-    time: '3h',
-    unread: true,
-  },
-  {
-    id: 'a3',
-    kind: 'attendance',
-    title: 'Attendance recorded',
-    body: 'You were marked present for AP Bio review session.',
-    time: 'Yesterday',
-    unread: false,
-  },
-];
+// Alerts are now real, in-app notifications from Supabase — see
+// src/state/notifications.js and supabase/notifications.sql.

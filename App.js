@@ -9,6 +9,7 @@ import { SessionProvider } from './src/state/session';
 import { GroupsProvider } from './src/state/groups';
 import { VotesProvider } from './src/state/votes';
 import { AttendanceProvider } from './src/state/attendance';
+import { NotificationsProvider } from './src/state/notifications';
 
 export default function App() {
   // Preload the icon font so glyphs render on first paint (otherwise icons
@@ -31,7 +32,9 @@ export default function App() {
         <GroupsProvider>
           <VotesProvider>
             <AttendanceProvider>
-              <RootNavigator />
+              <NotificationsProvider>
+                <RootNavigator />
+              </NotificationsProvider>
             </AttendanceProvider>
           </VotesProvider>
         </GroupsProvider>

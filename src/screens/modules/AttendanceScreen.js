@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import Card from '../../components/Card';
 import Header from '../../components/Header';
 import Pulse from '../../components/Pulse';
 import { colors, spacing, radius, type, shadow } from '../../theme';
+import { supabase } from '../../lib/supabase';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
 import {
@@ -61,6 +62,16 @@ export default function AttendanceScreen({ route, navigation }) {
   const loading = isLoading(groupId);
   // Computed on read: past the deadline with nothing recorded for today.
   const missed = !todayRecord && isPastDeadline(deadline) && !loading;
+
+  // When the miss is first observed, notify the group's Captain(s) (server
+  // dedups to once per group per day). Fire once per screen mount.
+  const notified = useRef(false);
+  useEffect(() => {
+    if (missed && !notified.current) {
+      notified.current = true;
+      supabase.rpc('notify_missed_checkin', { gid: groupId });
+    }
+  }, [missed, groupId]);
 
   async function onResolve(resolution) {
     try {
