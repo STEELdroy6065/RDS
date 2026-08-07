@@ -44,10 +44,7 @@ export default function HomeScreen({ navigation }) {
         {/* Header */}
         <Text style={styles.brand}>SYNQ</Text>
         <Text style={styles.greeting}>{greeting},</Text>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{firstName}</Text>
-          <Text style={styles.wave}> 👋</Text>
-        </View>
+        <Text style={styles.name}>{firstName}</Text>
         {myTopRole ? (
           <RoleBadge role={myTopRole} solid style={styles.headerBadge} />
         ) : null}
@@ -108,13 +105,12 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontWeight: '600',
   },
-  nameRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 2 },
   name: {
     ...type.display,
     fontSize: 34,
     color: colors.ink,
+    marginTop: 2,
   },
-  wave: { ...type.display, fontSize: 28 },
   headerBadge: { marginTop: spacing.lg },
   statsCard: {
     flexDirection: 'row',
