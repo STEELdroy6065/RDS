@@ -157,6 +157,24 @@ export function GroupsProvider({ children }) {
         await load();
         return groupId;
       },
+
+      // Leave a group — remove your own membership.
+      leaveGroup: async (groupId) => {
+        const { error } = await supabase
+          .from('memberships')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('user_id', user.id);
+        if (error) throw error;
+        await load();
+      },
+
+      // Delete a whole group (Admin only, enforced by RLS). Cascades all data.
+      deleteGroup: async (groupId) => {
+        const { error } = await supabase.from('groups').delete().eq('id', groupId);
+        if (error) throw error;
+        await load();
+      },
     }),
     [groups, rosters, loading, load, user]
   );

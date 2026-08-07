@@ -185,6 +185,24 @@ export function VotesProvider({ children }) {
     [refreshVote]
   );
 
+  // Delete a vote entirely (creator or group Admin/Captain, enforced by RLS).
+  const deleteVote = useCallback(async (voteId) => {
+    const { error } = await supabase.from('votes').delete().eq('id', voteId);
+    if (error) throw error;
+    setVotesById((prev) => {
+      const next = { ...prev };
+      delete next[voteId];
+      return next;
+    });
+    setVoteIdsByGroup((prev) => {
+      const next = {};
+      Object.keys(prev).forEach((gid) => {
+        next[gid] = prev[gid].filter((id) => id !== voteId);
+      });
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       votesForGroup: (groupId) =>
@@ -195,8 +213,9 @@ export function VotesProvider({ children }) {
       createVote,
       castVote,
       closeVote,
+      deleteVote,
     }),
-    [votesById, voteIdsByGroup, refreshGroup, refreshVote, createVote, castVote, closeVote]
+    [votesById, voteIdsByGroup, refreshGroup, refreshVote, createVote, castVote, closeVote, deleteVote]
   );
 
   return <VotesContext.Provider value={value}>{children}</VotesContext.Provider>;

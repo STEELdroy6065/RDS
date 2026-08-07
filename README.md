@@ -38,6 +38,7 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 4. [`supabase/feed.sql`](supabase/feed.sql) — `posts` table and RLS.
 5. [`supabase/reports.sql`](supabase/reports.sql) — `post_reports` table, RLS, and a post-delete (moderation) policy.
 6. [`supabase/notifications.sql`](supabase/notifications.sql) — `notifications` table, RLS, and the triggers/function that populate it.
+7. [`supabase/deletions.sql`](supabase/deletions.sql) — deletion controls: a `deleted` column + `delete_post()` for messages, and leave/delete-group and delete-vote RLS policies.
 
 Each is idempotent (safe to re-run).
 
@@ -249,6 +250,21 @@ Basics for real users, in the existing visual style:
 - **Privacy notice** — a plain-language `PrivacyScreen` listing what's collected
   (name, email, memberships, posts, votes, attendance) and that it's used only
   to run the app. Linked from Profile and shown as a consent line on sign-up.
+
+## Deletion & removal
+
+Role-aware controls (`supabase/deletions.sql`):
+
+- **Groups** — any member can **Leave** (removes their own membership); only the
+  **Admin** can **Delete** the whole group, which cascades away all its posts,
+  votes, attendance, memberships, and notifications. Both live in the group's
+  settings section with clear confirmations.
+- **Messages** — **WhatsApp-style soft delete**: the author, or a group
+  **Admin/Captain** (moderation), can delete a message via long-press → it's
+  replaced by a "This message was deleted" placeholder rather than vanishing.
+  Enforced by a `SECURITY DEFINER` `delete_post()` function.
+- **Votes** — the vote's **creator** or the group's **Admin/Captain** can delete
+  a vote entirely (open or closed), removing all cast ballots with it.
 
 ## Design
 

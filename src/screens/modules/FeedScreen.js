@@ -20,7 +20,7 @@ import { colors, spacing, radius, type, roleTheme } from '../../theme';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
-import { notify } from '../../lib/confirm';
+import { confirm, notify } from '../../lib/confirm';
 
 function relTime(iso) {
   if (!iso) return '';
@@ -49,15 +49,33 @@ export default function FeedScreen({ route, navigation }) {
   const [announce, setAnnounce] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Report modal
+  // Long-press action menu + report modal
+  const [menuPost, setMenuPost] = useState(null);
   const [reportPost, setReportPost] = useState(null);
   const [reason, setReason] = useState('');
   const [reporting, setReporting] = useState(false);
 
+  const canDelete = (post) => post.author_id === user.id || isModerator;
+
+  function deleteMessage(post) {
+    setMenuPost(null);
+    confirm({
+      title: 'Delete message?',
+      message: 'It will be replaced with “This message was deleted” for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+      onConfirm: async () => {
+        const { error } = await supabase.rpc('delete_post', { pid: post.id });
+        if (error) notify({ title: 'Could not delete', message: error.message });
+        else load();
+      },
+    });
+  }
+
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('posts')
-      .select('id, author_id, author_name, type, text, created_at')
+      .select('id, author_id, author_name, type, text, deleted, created_at')
       .eq('group_id', groupId)
       .order('created_at', { ascending: false }); // newest first → bottom of inverted list
     if (!error) setMessages(data || []);
@@ -143,10 +161,7 @@ export default function FeedScreen({ route, navigation }) {
             <Bubble
               post={item}
               own={item.author_id === user.id}
-              onLongPress={() => {
-                setReason('');
-                setReportPost(item);
-              }}
+              onLongPress={() => setMenuPost(item)}
             />
           )}
           ListEmptyComponent={
@@ -189,6 +204,48 @@ export default function FeedScreen({ route, navigation }) {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Long-press action menu */}
+      <Modal
+        visible={!!menuPost}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuPost(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setMenuPost(null)}>
+          <Pressable style={styles.menu} onPress={() => {}}>
+            {menuPost && canDelete(menuPost) ? (
+              <Pressable
+                onPress={() => deleteMessage(menuPost)}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.accent} />
+                <Text style={[styles.menuText, { color: colors.accent }]}>
+                  Delete message
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                const p = menuPost;
+                setMenuPost(null);
+                setReason('');
+                setReportPost(p);
+              }}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+            >
+              <Ionicons name="flag-outline" size={20} color={colors.inkSoft} />
+              <Text style={styles.menuText}>Report message</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMenuPost(null)}
+              style={({ pressed }) => [styles.menuItem, styles.menuCancel, pressed && styles.pressed]}
+            >
+              <Text style={styles.menuCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Report modal */}
       <Modal
@@ -239,6 +296,17 @@ export default function FeedScreen({ route, navigation }) {
 function Bubble({ post, own, onLongPress }) {
   const isAnnouncement = post.type === 'Announcement';
   const amber = roleTheme('Admin');
+
+  if (post.deleted) {
+    return (
+      <View style={[styles.deletedRow, own && styles.deletedRowOwn]}>
+        <View style={styles.deletedBubble}>
+          <Ionicons name="ban-outline" size={13} color={colors.muted} />
+          <Text style={styles.deletedText}>This message was deleted</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (isAnnouncement) {
     return (
@@ -334,6 +402,20 @@ const styles = StyleSheet.create({
   ownText: { ...type.body, color: colors.onPrimary, lineHeight: 20 },
   ownTime: { ...type.caption, color: colors.muted, fontSize: 10, marginLeft: 6, marginBottom: 2 },
 
+  // deleted placeholder
+  deletedRow: { alignItems: 'flex-start', marginBottom: spacing.md },
+  deletedRowOwn: { alignItems: 'flex-end' },
+  deletedBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  deletedText: { ...type.caption, color: colors.muted, fontStyle: 'italic' },
+
   // announcement (full width, highlighted)
   announceRow: { marginBottom: spacing.md },
   announceBubble: {
@@ -398,6 +480,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
+  menu: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
+  },
+  menuText: { ...type.bodyStrong, color: colors.ink },
+  menuCancel: { justifyContent: 'center', marginTop: spacing.xs },
+  menuCancelText: { ...type.bodyStrong, color: colors.muted },
   sheet: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center' },
   sheetIcon: {
     width: 52,

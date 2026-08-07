@@ -8,6 +8,7 @@ import Header from '../../components/Header';
 import Pulse from '../../components/Pulse';
 import { colors, spacing, radius, type } from '../../theme';
 import { useSession } from '../../state/session';
+import { useGroups } from '../../state/groups';
 import { useVotes } from '../../state/votes';
 import { confirm, notify } from '../../lib/confirm';
 import {
@@ -18,6 +19,7 @@ import {
   choiceOf,
   isCreator,
   canCloseVote,
+  canCreateVote,
   canVote,
   canSeeResults,
   statusLabel,
@@ -26,7 +28,8 @@ import {
 export default function VoteDetailScreen({ route, navigation }) {
   const { voteId, groupName } = route.params;
   const { user } = useSession();
-  const { getVote, refreshVote, castVote, closeVote } = useVotes();
+  const { roleForGroup } = useGroups();
+  const { getVote, refreshVote, castVote, closeVote, deleteVote } = useVotes();
 
   const [loaded, setLoaded] = useState(false);
 
@@ -68,8 +71,26 @@ export default function VoteDetailScreen({ route, navigation }) {
   const seeResults = canSeeResults(vote, user.id);
   const creator = isCreator(vote, user.id);
   const mayClose = canCloseVote(vote, user.id);
+  const mayDelete = creator || canCreateVote(roleForGroup(vote.groupId));
   const total = totalVotes(vote);
   const label = statusLabel(vote);
+
+  function onDelete() {
+    confirm({
+      title: 'Delete this vote?',
+      message: 'This removes the vote and all cast votes with it. This can’t be undone.',
+      confirmLabel: 'Delete vote',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteVote(vote.id);
+          navigation.goBack();
+        } catch (e) {
+          notify({ title: 'Could not delete the vote', message: e && e.message });
+        }
+      },
+    });
+  }
 
   function onClose() {
     confirm({
@@ -156,7 +177,7 @@ export default function VoteDetailScreen({ route, navigation }) {
             onPress={onClose}
             style={({ pressed }) => [styles.closeBtn, pressed && styles.closePressed]}
           >
-            <Ionicons name="lock-closed" size={18} color={colors.onPrimary} />
+            <Ionicons name="lock-closed" size={18} color={colors.ink} />
             <Text style={styles.closeText}>Close vote</Text>
           </Pressable>
         ) : null}
@@ -168,6 +189,17 @@ export default function VoteDetailScreen({ route, navigation }) {
               Closed · results are final and visible to everyone.
             </Text>
           </View>
+        ) : null}
+
+        {/* Delete — creator or group Admin/Captain, open or closed */}
+        {mayDelete ? (
+          <Pressable
+            onPress={onDelete}
+            style={({ pressed }) => [styles.deleteBtn, pressed && styles.closePressed]}
+          >
+            <Ionicons name="trash-outline" size={18} color={colors.accent} />
+            <Text style={styles.deleteText}>Delete vote</Text>
+          </Pressable>
         ) : null}
       </ScrollView>
     </Screen>
@@ -454,7 +486,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.ink,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     paddingVertical: spacing.lg,
     marginTop: spacing.lg,
@@ -462,7 +494,23 @@ const styles = StyleSheet.create({
   closePressed: { opacity: 0.85 },
   closeText: {
     ...type.bodyStrong,
-    color: colors.onPrimary,
+    color: colors.ink,
+    marginLeft: spacing.sm,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    marginTop: spacing.md,
+  },
+  deleteText: {
+    ...type.bodyStrong,
+    color: colors.accent,
     marginLeft: spacing.sm,
   },
   closedBanner: {

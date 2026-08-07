@@ -9,6 +9,7 @@ import RoleBadge from '../components/RoleBadge';
 import Header from '../components/Header';
 import { colors, spacing, radius, type, shadow, roleTheme } from '../theme';
 import { useGroups } from '../state/groups';
+import { confirm, notify } from '../lib/confirm';
 
 const MODULES = [
   {
@@ -47,8 +48,43 @@ const MODULES = [
 
 export default function GroupDetailScreen({ route, navigation }) {
   const { groupId } = route.params;
-  const { getGroup } = useGroups();
+  const { getGroup, leaveGroup, deleteGroup } = useGroups();
   const group = getGroup(groupId);
+
+  function onLeave() {
+    confirm({
+      title: 'Leave group?',
+      message: 'You’ll be removed and stop seeing this group.',
+      confirmLabel: 'Leave',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await leaveGroup(groupId);
+          navigation.goBack();
+        } catch (e) {
+          notify({ title: 'Could not leave', message: e && e.message });
+        }
+      },
+    });
+  }
+
+  function onDelete() {
+    confirm({
+      title: 'Delete this group?',
+      message:
+        'This permanently removes the group and all its posts, votes, and attendance for everyone. This can’t be undone.',
+      confirmLabel: 'Delete group',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteGroup(groupId);
+          navigation.goBack();
+        } catch (e) {
+          notify({ title: 'Could not delete', message: e && e.message });
+        }
+      },
+    });
+  }
 
   if (!group) {
     return (
@@ -113,6 +149,35 @@ export default function GroupDetailScreen({ route, navigation }) {
             />
           ))}
         </View>
+
+        {/* Group settings — leave / delete */}
+        <Text style={styles.settingsLabel}>Group settings</Text>
+
+        <Pressable
+          onPress={onLeave}
+          style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}
+        >
+          <Ionicons name="exit-outline" size={20} color={colors.inkSoft} />
+          <View style={styles.actionBody}>
+            <Text style={styles.actionTitle}>Leave group</Text>
+            <Text style={styles.actionSub}>Remove yourself from this group</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+        </Pressable>
+
+        {group.role === 'Admin' ? (
+          <Pressable
+            onPress={onDelete}
+            style={({ pressed }) => [styles.actionRow, styles.dangerRow, pressed && styles.actionPressed]}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.accent} />
+            <View style={styles.actionBody}>
+              <Text style={[styles.actionTitle, { color: colors.accent }]}>Delete group</Text>
+              <Text style={styles.actionSub}>Permanently removes it and all its data</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+          </Pressable>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -212,6 +277,27 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
+  settingsLabel: {
+    ...type.label,
+    color: colors.muted,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  dangerRow: { borderColor: colors.accent },
+  actionPressed: { opacity: 0.7 },
+  actionBody: { flex: 1, marginLeft: spacing.md },
+  actionTitle: { ...type.bodyStrong, color: colors.ink },
+  actionSub: { ...type.caption, color: colors.muted, marginTop: 1 },
   moduleCard: {
     width: '48.5%',
     backgroundColor: colors.surface,
