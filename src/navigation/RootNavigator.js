@@ -1,8 +1,8 @@
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -11,14 +11,12 @@ import ForgotPasswordScreen from '../screens/onboarding/ForgotPasswordScreen';
 import SetNewPasswordScreen from '../screens/onboarding/SetNewPasswordScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import HomeScreen from '../screens/HomeScreen';
-import GroupsScreen from '../screens/GroupsScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import NewGroupScreen from '../screens/NewGroupScreen';
 import ScanGroupScreen from '../screens/ScanGroupScreen';
 import FeedScreen from '../screens/modules/FeedScreen';
-import NewPostScreen from '../screens/modules/NewPostScreen';
 import VotesScreen from '../screens/modules/VotesScreen';
 import VoteDetailScreen from '../screens/modules/VoteDetailScreen';
 import NewVoteScreen from '../screens/modules/NewVoteScreen';
@@ -26,8 +24,10 @@ import MembersScreen from '../screens/modules/MembersScreen';
 import AttendanceScreen from '../screens/modules/AttendanceScreen';
 import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
+import GroupRail from '../components/GroupRail';
+import FloatingTabBar from '../components/FloatingTabBar';
 
-import { colors, type } from '../theme';
+import { colors } from '../theme';
 import { useSession } from '../state/session';
 
 const Tab = createBottomTabNavigator();
@@ -45,49 +45,29 @@ const navTheme = {
   },
 };
 
-const TAB_ICONS = {
-  Home: ['home', 'home-outline'],
-  Groups: ['people', 'people-outline'],
-  Alerts: ['notifications', 'notifications-outline'],
-  Profile: ['person', 'person-outline'],
-};
-
 function Tabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: 88,
-          paddingTop: 8,
-          paddingBottom: 28,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          letterSpacing: 0.2,
-        },
-        tabBarIcon: ({ focused, color, size }) => {
-          const [active, inactive] = TAB_ICONS[route.name];
-          return (
-            <Ionicons
-              name={focused ? active : inactive}
-              size={size - 2}
-              color={color}
-            />
-          );
-        },
-      })}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Groups" component={GroupsScreen} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
+  );
+}
+
+// Discord-style shell: persistent group rail on the left, the tabbed content
+// (with its floating pill bar) on the right.
+function MainShell() {
+  return (
+    <View style={styles.shell}>
+      <GroupRail />
+      <View style={styles.shellContent}>
+        <Tabs />
+      </View>
+    </View>
   );
 }
 
@@ -105,12 +85,11 @@ export default function RootNavigator() {
           <Stack.Screen name="SetNewPassword" component={SetNewPasswordScreen} />
         ) : session ? (
           <>
-            <Stack.Screen name="Tabs" component={Tabs} />
+            <Stack.Screen name="Tabs" component={MainShell} />
             <Stack.Screen name="NewGroup" component={NewGroupScreen} />
             <Stack.Screen name="ScanGroup" component={ScanGroupScreen} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
             <Stack.Screen name="Feed" component={FeedScreen} />
-            <Stack.Screen name="NewPost" component={NewPostScreen} />
             <Stack.Screen name="ReportedPosts" component={ReportedPostsScreen} />
             <Stack.Screen name="Votes" component={VotesScreen} />
             <Stack.Screen name="VoteDetail" component={VoteDetailScreen} />
@@ -133,3 +112,8 @@ export default function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
+  shellContent: { flex: 1 },
+});

@@ -54,7 +54,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No groups yet</Text>
             <Text style={styles.emptySub}>
-              Head to the Groups tab to create or join your first group.
+              Tap the + on the left rail to create or join your first group.
             </Text>
           </View>
         ) : (
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120,
   },
   brand: {
     ...type.label,

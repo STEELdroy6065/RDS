@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../components/Screen';
-import Card from '../components/Card';
 import Pulse from '../components/Pulse';
 import { useStatusBar } from '../components/useStatusBar';
 import { colors, spacing, radius, type } from '../theme';
@@ -34,30 +33,29 @@ export default function AlertsScreen() {
           ) : null}
         </View>
 
-        {alerts.map((a) => {
+        {alerts.map((a, i) => {
           const meta = KIND_META[a.kind] || KIND_META.announcement;
           return (
-            <Card key={a.id} style={styles.item} onPress={() => {}}>
-              <View style={styles.row}>
-                <View style={[styles.icon, { backgroundColor: meta.bg }]}>
-                  <Ionicons name={meta.icon} size={18} color={meta.fg} />
-                </View>
-                <View style={styles.body}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>
-                      {a.title}
-                    </Text>
-                    {a.unread ? (
-                      <Pulse color={colors.accent} size={7} style={styles.unreadPulse} />
-                    ) : null}
-                  </View>
-                  <Text style={styles.itemBody} numberOfLines={2}>
-                    {a.body}
-                  </Text>
-                  <Text style={styles.time}>{a.time}</Text>
-                </View>
+            <View
+              key={a.id}
+              style={[styles.row, i < alerts.length - 1 && styles.rowBorder]}
+            >
+              <View style={[styles.icon, { backgroundColor: meta.bg }]}>
+                <Ionicons name={meta.icon} size={18} color={meta.fg} />
               </View>
-            </Card>
+              <View style={styles.body}>
+                <Text style={styles.itemTitle} numberOfLines={1}>
+                  {a.title}
+                </Text>
+                <Text style={styles.itemBody} numberOfLines={1}>
+                  {a.body}
+                </Text>
+              </View>
+              <View style={styles.right}>
+                <Text style={styles.time}>{a.time}</Text>
+                {a.unread ? <Pulse color={colors.accent} size={7} style={styles.dot} /> : null}
+              </View>
+            </View>
           );
         })}
       </ScrollView>
@@ -69,17 +67,14 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120,
   },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  title: {
-    ...type.display,
-    color: colors.ink,
-  },
+  title: { ...type.display, color: colors.ink },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,49 +85,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
   },
-  badgeText: {
-    ...type.label,
-    fontSize: 10,
-    color: colors.onPrimary,
-  },
-  item: {
-    marginBottom: spacing.md,
-  },
+  badgeText: { ...type.label, fontSize: 10, color: colors.onPrimary },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
   },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
   icon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemTitle: {
-    ...type.bodyStrong,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  unreadPulse: {
-    marginLeft: spacing.sm,
-  },
-  itemBody: {
-    ...type.caption,
-    color: colors.inkSoft,
-    marginTop: 3,
-    lineHeight: 18,
-  },
-  time: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: 6,
-  },
+  body: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
+  itemTitle: { ...type.bodyStrong, color: colors.ink },
+  itemBody: { ...type.caption, color: colors.muted, marginTop: 2 },
+  right: { alignItems: 'flex-end', gap: 6 },
+  time: { ...type.caption, color: colors.muted, fontSize: 11 },
+  dot: {},
 });

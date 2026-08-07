@@ -63,16 +63,18 @@ npm run android    # Android emulator
 
 ## What's in the skeleton
 
-The app opens into an onboarding flow, then a bottom-tab shell with a group
-detail flow.
+The app opens into an onboarding flow, then a **Discord-style shell**: a
+persistent left **group rail** (`GroupRail`) for switching groups, and the main
+content with a **floating pill bottom bar** (`FloatingTabBar`) of just Home /
+Alerts / Profile.
 
 | Area | Screen | Notes |
 | --- | --- | --- |
 | **Splash** | `SplashScreen` | Synq wordmark; shown while the session is restored. |
 | **Welcome** | `WelcomeScreen` | One-line pitch + "Get Started". |
 | **Sign up / Log in** | `AuthScreen` | **Real Supabase email + password auth**, with validation and error messages. |
+| **Group rail** | `GroupRail` | Always-visible vertical rail of circular group icons, ringed by your role; tap to jump into a group, `+` to create/join. |
 | **Home** | `HomeScreen` | Greeting, quick stats, and the user's real groups. |
-| **Groups** | `GroupsScreen` | Real group list (from Supabase) + "New group" → create or join. |
 | **New group** | `NewGroupScreen` | Create (name + template) or Join (**scan a QR** / enter a code); both add to the live groups and open the group. |
 | **Scan group** | `ScanGroupScreen` | Camera QR scanner (`expo-camera`) — scan a group's QR to join. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
@@ -83,10 +85,11 @@ detail flow.
 
 Tapping a group opens its detail screen, which routes into four modules:
 
-- **Feed** — real posts backed by **Supabase** (`posts` table). Any group
-  member can create a post (Announcement / Resource / Discussion); RLS limits
-  reading and posting to group members. Newest-first, with the author's name
-  and a relative timestamp.
+- **Feed** — a real **chat** backed by **Supabase** (`posts` table): message
+  bubbles (yours right-aligned, others left with avatar + name), a fixed
+  bottom input bar to send, and a distinct highlighted **Announcement** bubble
+  (Admin/Captain can toggle the megaphone to broadcast one). Long-press a
+  message to report it. RLS limits reading and posting to group members.
 - **Votes** — a **role-based** voting system, backed by **Supabase** (real
   tables + RLS):
   - Each user has a permission role per group (Admin / Captain / Member),
@@ -131,7 +134,11 @@ Tapping a group opens its detail screen, which routes into four modules:
 App.js                     App entry (providers + navigator)
 src/
   navigation/
-    RootNavigator.js       Onboarding + bottom tabs + stack (detail & modules)
+    RootNavigator.js       Onboarding + group-rail shell + floating tabs + stack
+  components/
+    GroupRail.js           Discord-style vertical group switcher
+    FloatingTabBar.js      Floating pill bottom nav (Home / Alerts / Profile)
+    …                      Card, Avatar, RoleBadge, Pulse, Header, …
   screens/
     onboarding/
       SplashScreen.js
@@ -141,13 +148,11 @@ src/
       SetNewPasswordScreen.js
     PrivacyScreen.js
     HomeScreen.js
-    GroupsScreen.js
     AlertsScreen.js
     ProfileScreen.js
     GroupDetailScreen.js
     modules/
-      FeedScreen.js         Supabase posts (newest first) + report action
-      NewPostScreen.js      Create a post (type + text)
+      FeedScreen.js         Chat (bubbles + input bar + announcements)
       ReportedPostsScreen.js  Admin/Captain moderation view
       VotesScreen.js        List of a group's votes + gated "New vote"
       VoteDetailScreen.js   Named results, live/hidden logic, close action

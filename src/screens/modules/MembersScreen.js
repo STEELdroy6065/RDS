@@ -1,14 +1,16 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Screen from '../../components/Screen';
-import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
+import RoleBadge from '../../components/RoleBadge';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
-import { colors, spacing, type } from '../../theme';
+import { colors, spacing, type, roleTheme } from '../../theme';
 import { useGroups } from '../../state/groups';
 
-const LEAD_ROLES = ['Coach', 'Advisor', 'Captain', 'Organizer', 'Lead', 'Admin'];
+// The three permission roles get the role-colored badge + ring; other
+// descriptive roles (Coach, Player, …) use a neutral badge.
+const APP_ROLES = ['Admin', 'Captain', 'Member'];
 
 export default function MembersScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
@@ -17,11 +19,7 @@ export default function MembersScreen({ route, navigation }) {
 
   return (
     <Screen>
-      <Header
-        title="Members"
-        subtitle={groupName}
-        onBack={() => navigation.goBack()}
-      />
+      <Header title={groupName} subtitle="Members" onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -29,24 +27,27 @@ export default function MembersScreen({ route, navigation }) {
         <Text style={styles.count}>
           {members.length} {members.length === 1 ? 'person' : 'people'}
         </Text>
-        <Card padded={false}>
-          {members.map((m, i) => (
+
+        {members.map((m, i) => {
+          const isAppRole = APP_ROLES.includes(m.role);
+          const ring = isAppRole ? roleTheme(m.role).ring : undefined;
+          return (
             <View
               key={m.id}
-              style={[
-                styles.row,
-                i < members.length - 1 && styles.rowBorder,
-              ]}
+              style={[styles.row, i < members.length - 1 && styles.rowBorder]}
             >
-              <Avatar name={m.name} size={42} />
-              <Text style={styles.name}>{m.name}</Text>
-              <Badge
-                label={m.role}
-                tone={LEAD_ROLES.includes(m.role) ? 'primary' : 'neutral'}
-              />
+              <Avatar name={m.name} size={40} ring={ring} />
+              <Text style={styles.name} numberOfLines={1}>
+                {m.name}
+              </Text>
+              {isAppRole ? (
+                <RoleBadge role={m.role} />
+              ) : (
+                <Badge label={m.role} tone="neutral" />
+              )}
             </View>
-          ))}
-        </Card>
+          );
+        })}
       </ScrollView>
     </Screen>
   );
@@ -60,12 +61,11 @@ const styles = StyleSheet.create({
   count: {
     ...type.label,
     color: colors.muted,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
   rowBorder: {
@@ -77,5 +77,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     flex: 1,
     marginLeft: spacing.md,
+    marginRight: spacing.sm,
   },
 });

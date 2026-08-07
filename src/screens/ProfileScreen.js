@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120,
   },
   title: {
     ...type.display,
