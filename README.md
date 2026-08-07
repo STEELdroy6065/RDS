@@ -73,7 +73,8 @@ detail flow.
 | **Sign up / Log in** | `AuthScreen` | **Real Supabase email + password auth**, with validation and error messages. |
 | **Home** | `HomeScreen` | Greeting, quick stats, and the user's real groups. |
 | **Groups** | `GroupsScreen` | Real group list (from Supabase) + "New group" → create or join. |
-| **New group** | `NewGroupScreen` | Create (name + template) or Join (code / discoverable list); both add to the live groups and open the group. |
+| **New group** | `NewGroupScreen` | Create (name + template) or Join (**scan a QR** / enter a code); both add to the live groups and open the group. |
+| **Scan group** | `ScanGroupScreen` | Camera QR scanner (`expo-camera`) — scan a group's QR to join. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
 | **Profile** | `ProfileScreen` | Profile card + non-functional settings rows. |
 | **Group Detail** | `GroupDetailScreen` | Group header + four module cards. |
@@ -189,9 +190,11 @@ Real in this step: **Auth** and **groups / membership**.
 - **`memberships`** — `user_id, group_id, role (Admin | Captain | Member),
   joined_at`, unique per (user, group).
 - **Creating** a group inserts a `groups` row and an `Admin` membership for the
-  creator. **Joining** (by group code = the group's id) inserts a `Member`
-  membership. Home/Groups load the real groups you belong to, with your real
-  role. Each group's page shows its **code** so you can invite others.
+  creator. **Joining** inserts a `Member` membership — by **scanning the group's
+  QR code** (the group id, via `expo-camera`) or by entering the code manually.
+  Each group's page shows a **QR code** (rendered with `react-native-qrcode-svg`)
+  to invite others. Home/Groups load the real groups you belong to, with your
+  real role.
 - **Row Level Security** — you can only see groups you created or belong to, and
   membership rows only for those groups. A `SECURITY DEFINER` helper
   (`is_group_member`) keeps the policies recursion-free.

@@ -16,6 +16,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import NewGroupScreen from '../screens/NewGroupScreen';
+import ScanGroupScreen from '../screens/ScanGroupScreen';
 import FeedScreen from '../screens/modules/FeedScreen';
 import NewPostScreen from '../screens/modules/NewPostScreen';
 import VotesScreen from '../screens/modules/VotesScreen';
@@ -106,6 +107,7 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Tabs" component={Tabs} />
             <Stack.Screen name="NewGroup" component={NewGroupScreen} />
+            <Stack.Screen name="ScanGroup" component={ScanGroupScreen} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
             <Stack.Screen name="Feed" component={FeedScreen} />
             <Stack.Screen name="NewPost" component={NewPostScreen} />

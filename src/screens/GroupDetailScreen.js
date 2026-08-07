@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import Screen from '../components/Screen';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -82,10 +83,16 @@ export default function GroupDetailScreen({ route, navigation }) {
 
         {/* Invite code — share so others can join this group */}
         <View style={styles.codeCard}>
-          <View style={styles.codeLeft}>
-            <Ionicons name="key-outline" size={16} color={colors.primary} />
-            <Text style={styles.codeLabel}>Group code</Text>
+          <Text style={styles.codeLabel}>Invite to this group</Text>
+          <View style={styles.qrTile}>
+            <QRCode
+              value={group.id}
+              size={168}
+              color="#000000"
+              backgroundColor="#FFFFFF"
+            />
           </View>
+          <Text style={styles.codeHint}>Scan this to join · {group.name}</Text>
           <Text style={styles.codeValue} selectable numberOfLines={1}>
             {group.id}
           </Text>
@@ -170,28 +177,35 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   codeCard: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.xl,
     marginBottom: spacing.lg,
+    ...shadow.card,
   },
-  codeLeft: { flexDirection: 'row', alignItems: 'center' },
   codeLabel: {
     ...type.label,
     color: colors.muted,
-    marginLeft: 6,
+    marginBottom: spacing.lg,
+  },
+  qrTile: {
+    backgroundColor: '#FFFFFF',
+    padding: spacing.md,
+    borderRadius: radius.sm,
+  },
+  codeHint: {
+    ...type.bodyStrong,
+    fontSize: 13,
+    color: colors.ink,
+    marginTop: spacing.lg,
   },
   codeValue: {
     ...type.caption,
-    color: colors.inkSoft,
-    flexShrink: 1,
-    marginLeft: spacing.md,
+    color: colors.muted,
+    marginTop: spacing.xs,
+    fontSize: 11,
   },
   grid: {
     flexDirection: 'row',

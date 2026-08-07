@@ -5,20 +5,32 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "synq",
-    "userInterfaceStyle": "light",
-    "backgroundColor": "#F5F4F8",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#121319",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#5646C4"
+      "backgroundColor": "#121319"
     },
     "assetBundlePatterns": ["**/*"],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Synq to use your camera to scan a group's QR code and join."
+        }
+      ]
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Synq to use your camera to scan a group's QR code and join."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#5646C4"
-      }
+        "backgroundColor": "#121319"
+      },
+      "permissions": ["CAMERA"]
     },
     "web": {
       "bundler": "metro"

@@ -35,7 +35,7 @@ export default function NewGroupScreen({ navigation }) {
       {tab === 'create' ? (
         <CreateTab onCreated={openGroup} />
       ) : (
-        <JoinTab onJoined={openGroup} />
+        <JoinTab onJoined={openGroup} onScan={() => navigation.navigate('ScanGroup')} />
       )}
     </Screen>
   );
@@ -153,7 +153,7 @@ function CreateTab({ onCreated }) {
 
 // --- Join ---------------------------------------------------------------
 
-function JoinTab({ onJoined }) {
+function JoinTab({ onJoined, onScan }) {
   const { joinByCode } = useGroups();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -184,6 +184,26 @@ function JoinTab({ onJoined }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <Pressable
+          onPress={onScan}
+          style={({ pressed }) => [styles.scanBtn, pressed && styles.pressed]}
+        >
+          <View style={styles.scanIcon}>
+            <Ionicons name="qr-code-outline" size={22} color={colors.onPrimary} />
+          </View>
+          <View style={styles.scanBody}>
+            <Text style={styles.scanTitle}>Scan QR code</Text>
+            <Text style={styles.scanSub}>Point your camera at a group’s QR</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or enter a code</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
         <Text style={styles.label}>Group code</Text>
         <TextInput
           value={code}
@@ -337,6 +357,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: spacing.md,
+  },
+  scanIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanBody: { flex: 1, marginLeft: spacing.md },
+  scanTitle: { ...type.bodyStrong, color: colors.ink },
+  scanSub: { ...type.caption, color: colors.muted, marginTop: 1 },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xl,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.divider },
+  dividerText: {
+    ...type.label,
+    color: colors.muted,
+    marginHorizontal: spacing.md,
+  },
   joinHint: {
     flexDirection: 'row',
     alignItems: 'flex-start',
