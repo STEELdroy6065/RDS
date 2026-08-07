@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/Screen';
 import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
@@ -9,8 +10,8 @@ import { colors, spacing, radius, type, shadow, topRole } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 
-function greeting() {
-  const h = new Date().getHours();
+function greetingFor(date) {
+  const h = date.getHours();
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
@@ -23,6 +24,17 @@ export default function HomeScreen({ navigation }) {
   const firstName = user && user.name ? user.name.split(' ')[0] : 'there';
   const myTopRole = groups.length ? topRole(groups.map((g) => g.role)) : null;
 
+  // Keep the greeting current: refresh when Home is focused and tick each
+  // minute while it's open, so it flips as the time of day changes.
+  const [greeting, setGreeting] = useState(() => greetingFor(new Date()));
+  useFocusEffect(
+    useCallback(() => {
+      setGreeting(greetingFor(new Date()));
+      const id = setInterval(() => setGreeting(greetingFor(new Date())), 60 * 1000);
+      return () => clearInterval(id);
+    }, [])
+  );
+
   return (
     <Screen>
       <ScrollView
@@ -31,7 +43,7 @@ export default function HomeScreen({ navigation }) {
       >
         {/* Header */}
         <Text style={styles.brand}>SYNQ</Text>
-        <Text style={styles.greeting}>{greeting()},</Text>
+        <Text style={styles.greeting}>{greeting},</Text>
         <View style={styles.nameRow}>
           <Text style={styles.name}>{firstName}</Text>
           <Text style={styles.wave}> 👋</Text>
