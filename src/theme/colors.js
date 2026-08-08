@@ -1,52 +1,45 @@
-// Synq palette — dark theme.
-// Deep charcoal-navy canvas, subtly lighter panels, light text, with the
-// role-color system as the main pop of color (see roles.js).
+// Synq palette — clean, professional, monochrome.
+// White canvas, near-black ink, restrained grays, black as the primary accent.
+// Color is used sparingly (red only for destructive/attention).
 
 export const colors = {
   // Canvas & surfaces
-  bg: '#121319', // deep charcoal-navy (not pure black)
-  surface: '#1C1D26', // card panels — just enough lift off the bg
-  surfaceAlt: '#262733', // inputs, segments, chips
+  bg: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F3F3F5', // inputs, chips, icon tiles
 
   // Ink / text
-  ink: '#F4F4F8', // primary text (near-white)
-  inkSoft: '#C4C5D2', // secondary text
-  muted: '#8A8B9C', // captions / placeholders
+  ink: '#15161B', // near-black text
+  inkSoft: '#54555E', // secondary text
+  muted: '#9A9BA4', // captions, line icons, placeholders
   onPrimary: '#FFFFFF',
 
-  // Brand (brightened to pop on dark)
-  primary: '#7C6CF0',
-  primaryDark: '#5B4BE1',
-  primarySoft: '#24223E', // dark indigo panel (badge/icon backdrop)
+  // Brand / primary = near-black
+  primary: '#15161B',
+  primaryDark: '#000000',
+  primarySoft: '#F3F3F5',
 
-  // Accent
-  accent: '#FF7A66',
-  accentSoft: '#3A2420',
+  // Accent — reserved for destructive / attention only
+  accent: '#CF3B2E',
+  accentSoft: '#FBECE9',
 
-  // Semantic
-  success: '#2FCB92',
-  successSoft: '#16302A',
-  warning: '#E9AE4B',
-  warningSoft: '#332811',
-  info: '#4F9DF7',
-  infoSoft: '#152A40',
+  // Semantic — muted, used sparingly
+  success: '#2F7D5B',
+  successSoft: '#ECF4EF',
+  warning: '#8C6D1E',
+  warningSoft: '#F4EFDF',
+  info: '#3C6CA6',
+  infoSoft: '#EBF1F8',
 
-  // Lines & shadow (subtle, no harsh borders)
-  border: '#2A2B36',
-  divider: '#24252F',
-  shadow: '#000000',
+  // Lines & shadow
+  border: '#E7E7EB',
+  divider: '#EFEFF2',
+  shadow: '#15161B',
 };
 
-// Vivid avatar colors, keyed to the role palette so initials read as colorful
-// on the dark background.
-export const avatarPalette = [
-  '#7C6CF0', // indigo
-  '#19B5B5', // teal
-  '#E0A93A', // amber
-  '#4F9DF7', // blue
-  '#E8557A', // pink
-  '#2FCB92', // green
-];
+// Restrained, professional avatar tones (neutral grays) so initials read as
+// clean, not colorful.
+export const avatarPalette = ['#3F4048', '#54555E', '#6B6C75'];
 
 export function colorFromString(str = '') {
   let hash = 0;

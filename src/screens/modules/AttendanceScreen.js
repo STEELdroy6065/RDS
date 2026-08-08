@@ -19,8 +19,8 @@ import {
 import { notify } from '../../lib/confirm';
 
 const KIND_META = {
-  submitted: { icon: 'checkmark-done-outline', bg: colors.successSoft, fg: colors.success },
-  missed_self_study: { icon: 'book-outline', bg: colors.primarySoft, fg: colors.primary },
+  submitted: { icon: 'checkmark-done-outline', bg: colors.surfaceAlt, fg: colors.inkSoft },
+  missed_self_study: { icon: 'book-outline', bg: colors.surfaceAlt, fg: colors.inkSoft },
   missed_escalated: { icon: 'arrow-up-circle-outline', bg: colors.accentSoft, fg: colors.accent },
 };
 

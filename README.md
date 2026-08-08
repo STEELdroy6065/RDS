@@ -268,26 +268,30 @@ Role-aware controls (`supabase/deletions.sql`):
 
 ## Design
 
-A polished **dark theme** with the **role-color system** as the main pop of
-color — built around Synq's core idea that the app knows your role and routes
-accordingly.
+A clean, **professional monochrome** look — white canvas, near-black ink,
+restrained grays, and black as the primary "brand" color. Color is used
+sparingly and only where it means something. The goal is a calm, business-like
+product, not a flashy one.
 
-- **Dark base** (`src/theme/colors.js`) — a deep charcoal-navy canvas (`#121319`,
-  not pure black), subtly lighter card panels (`#1C1D26`), light text, and soft
-  low-contrast dividers instead of harsh borders.
-- **Role colors** (`src/theme/roles.js`) — vivid **Admin/Teacher gold**,
-  **Captain teal**, **Member indigo** that pop against the dark: group card left
-  stripes, avatar rings, role-colored initials, and role badges (`RoleBadge`).
-- **Shape & spacing** — soft, rounded, pill-shaped elements (generous `radius`
-  tokens) with roomy spacing.
-- **The pulse** (`src/components/Pulse.js`) — a dot with an expanding, fading
-  ring, like a signal reaching someone. Tuned for the dark background and used
-  wherever something signals an update: new alerts, a live vote, an attendance
-  cascade.
-- **Icons** — a single family (Ionicons), line/outline style on the primary
-  surfaces for a clean, consistent look.
-- **Foundations** — brightened indigo-violet primary (`#7C6CF0`) + warm coral
-  accent; a deliberate system-font scale; tokens centralized in `src/theme`.
+- **Monochrome base** (`src/theme/colors.js`) — a white canvas (`#FFFFFF`),
+  near-black text (`#15161B`), a light gray fill (`#F3F3F5`) for inputs, chips
+  and icon tiles, and thin `#E7E7EB` borders for definition instead of heavy
+  shadows. The only chromatic accent is a single red (`#CF3B2E`), reserved for
+  destructive/attention states (sign out, reports, an escalated check-in).
+- **Grayscale roles** (`src/theme/roles.js`) — role is still a visual signal,
+  now expressed as **weight** rather than hue: Admin reads darkest, Captain
+  mid-gray, Member lightest, on avatar rings, badges (`RoleBadge`) and the group
+  rail.
+- **Black headers** — key surfaces (e.g. the Profile identity header) use a
+  solid black band with white text, echoing a clean utility-app layout.
+- **Shape & spacing** — modest corner radii and plain, functional spacing;
+  no oversized pills or glow.
+- **Signal dot** (`src/components/Pulse.js`) — a small static dot marks unread
+  items (alerts, live votes) — quiet, not animated.
+- **Icons** — a single family (Ionicons), thin line/outline style in gray for a
+  clean, consistent list-driven look.
+- **Foundations** — a deliberate system-font scale, tokens centralized in
+  `src/theme` so the whole app re-themes by flipping the palette.
 
 ## Status
 

@@ -5,11 +5,11 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "synq",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#121319",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#121319"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": ["**/*"],
     "plugins": [
@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#121319"
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": ["CAMERA"]
     },

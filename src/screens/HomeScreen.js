@@ -6,7 +6,7 @@ import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
 import RoleBadge from '../components/RoleBadge';
 import { useStatusBar } from '../components/useStatusBar';
-import { colors, spacing, radius, type, shadow, topRole } from '../theme';
+import { colors, spacing, radius, type, topRole } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 
@@ -18,7 +18,7 @@ function greetingFor(date) {
 }
 
 export default function HomeScreen({ navigation }) {
-  useStatusBar('light');
+  useStatusBar('dark');
   const { user } = useSession();
   const { groups } = useGroups();
   const firstName = user && user.name ? user.name.split(' ')[0] : 'there';
@@ -117,10 +117,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingVertical: spacing.xl,
     marginTop: spacing.xl,
     marginBottom: spacing.xl,
-    ...shadow.card,
   },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: { ...type.title, fontSize: 26, color: colors.ink },

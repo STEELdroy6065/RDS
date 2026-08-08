@@ -10,9 +10,9 @@ import { useNotifications } from '../state/notifications';
 import { useGroups } from '../state/groups';
 
 const TYPE_META = {
-  new_vote: { icon: 'bar-chart-outline', bg: colors.primarySoft, fg: colors.primary, label: 'Vote' },
-  new_announcement: { icon: 'megaphone-outline', bg: colors.accentSoft, fg: colors.accent, label: 'Announcement' },
-  attendance_missed: { icon: 'alert-circle-outline', bg: colors.warningSoft, fg: colors.warning, label: 'Attendance' },
+  new_vote: { icon: 'bar-chart-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Vote' },
+  new_announcement: { icon: 'megaphone-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Announcement' },
+  attendance_missed: { icon: 'alert-circle-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Attendance' },
   post_reported: { icon: 'flag-outline', bg: colors.accentSoft, fg: colors.accent, label: 'Report' },
 };
 
@@ -30,7 +30,7 @@ function relTime(iso) {
 }
 
 export default function AlertsScreen({ navigation }) {
-  useStatusBar('light');
+  useStatusBar('dark');
   const { items, loading, unreadCount, refresh, markRead, markAllRead } = useNotifications();
   const { getGroup } = useGroups();
 

@@ -7,10 +7,9 @@ import Avatar from './Avatar';
 import { colors, spacing, radius, type, roleTheme } from '../theme';
 import { useGroups } from '../state/groups';
 
-// Discord-style vertical rail of the user's groups, always visible on the main
-// surface. Each icon is ringed by the user's role color; tapping jumps into
-// that group.
-const RAIL_BG = '#0B0C11';
+// Vertical rail of the user's groups, always visible on the main surface. Each
+// icon is ringed by the user's (grayscale) role weight; tapping jumps into it.
+const RAIL_BG = '#FAFAFB';
 
 export default function GroupRail() {
   const insets = useSafeAreaInsets();
@@ -61,6 +60,8 @@ const styles = StyleSheet.create({
   rail: {
     width: 72,
     backgroundColor: RAIL_BG,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
     alignItems: 'center',
   },
   brand: {

@@ -1,70 +1,83 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Screen from '../components/Screen';
-import Card from '../components/Card';
 import Avatar from '../components/Avatar';
-import RoleBadge from '../components/RoleBadge';
-import SectionLabel from '../components/SectionLabel';
 import { useStatusBar } from '../components/useStatusBar';
-import { colors, spacing, radius, type, shadow, topRole, roleTheme } from '../theme';
+import { colors, spacing, radius, type, topRole } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 import { confirm } from '../lib/confirm';
 
-const SETTINGS = [
-  { id: 's1', icon: 'notifications-outline', label: 'Notifications' },
-  { id: 's2', icon: 'lock-closed-outline', label: 'Privacy' },
-  { id: 's3', icon: 'color-palette-outline', label: 'Appearance' },
-  { id: 's4', icon: 'help-circle-outline', label: 'Help & support' },
-  { id: 's5', icon: 'log-out-outline', label: 'Sign out', danger: true },
+// Grouped settings — clean single-color line icons, ride-app style.
+const SECTIONS = [
+  {
+    key: 'account',
+    rows: [
+      { id: 'notifications', icon: 'notifications-outline', label: 'Notifications' },
+      { id: 'privacy', icon: 'lock-closed-outline', label: 'Privacy' },
+      { id: 'appearance', icon: 'contrast-outline', label: 'Appearance' },
+    ],
+  },
+  {
+    key: 'support',
+    rows: [
+      { id: 'help', icon: 'help-circle-outline', label: 'Help & support' },
+      { id: 'about', icon: 'information-circle-outline', label: 'About Synq' },
+    ],
+  },
+  {
+    key: 'session',
+    rows: [
+      { id: 'signout', icon: 'log-out-outline', label: 'Sign out', danger: true },
+    ],
+  },
 ];
 
 export default function ProfileScreen({ navigation }) {
   useStatusBar('light');
+  const insets = useSafeAreaInsets();
   const { user, signOut } = useSession();
   const { groups } = useGroups();
 
   const name = user ? user.name : 'Member';
-  const subtitle = user ? user.email : '';
+  const email = user ? user.email : '';
   const myTopRole = groups.length ? topRole(groups.map((g) => g.role)) : 'Member';
-  const rc = roleTheme(myTopRole);
 
   function confirmSignOut() {
     confirm({
-      title: 'Log out',
-      message: 'Are you sure you want to log out?',
-      confirmLabel: 'Log out',
+      title: 'Sign out',
+      message: 'Are you sure you want to sign out?',
+      confirmLabel: 'Sign out',
       destructive: true,
       onConfirm: () => signOut(),
     });
   }
 
-  function onSettingPress(id) {
-    if (id === 's2') navigation.navigate('PrivacyNotice');
-    else if (id === 's5') confirmSignOut();
+  function onRowPress(id) {
+    if (id === 'privacy') navigation.navigate('PrivacyNotice');
+    else if (id === 'signout') confirmSignOut();
   }
 
   return (
-    <Screen>
+    <Screen topInset={false}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Profile</Text>
-
-        {/* Identity */}
-        <View style={styles.identity}>
-          <Avatar name={name} size={80} ring={rc.ring} color={rc.solid} />
-          <Text style={styles.name}>{name}</Text>
-          {subtitle ? <Text style={styles.email}>{subtitle}</Text> : null}
-          {groups.length ? (
-            <RoleBadge role={myTopRole} solid style={styles.badge} />
-          ) : null}
+        {/* Black identity header — edge to edge */}
+        <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
+          <Avatar name={name} size={64} color="#3F4048" />
+          <View style={styles.headerText}>
+            <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
+            {email ? <Text style={styles.headerSub} numberOfLines={1}>{email}</Text> : null}
+            <Text style={styles.headerRole}>{myTopRole}</Text>
+          </View>
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsCard}>
+        {/* Compact stats strip */}
+        <View style={styles.stats}>
           <Stat value={groups.length} label="Groups" />
           <View style={styles.vDivider} />
           <Stat value={0} label="Votes cast" />
@@ -72,30 +85,34 @@ export default function ProfileScreen({ navigation }) {
           <Stat value="—" label="Attendance" />
         </View>
 
-        <SectionLabel style={styles.section}>Settings</SectionLabel>
-        <Card padded={false}>
-          {SETTINGS.map((s, i) => (
-            <Pressable
-              key={s.id}
-              onPress={() => onSettingPress(s.id)}
-              style={({ pressed }) => [
-                styles.settingRow,
-                i < SETTINGS.length - 1 && styles.settingBorder,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons
-                name={s.icon}
-                size={20}
-                color={s.danger ? colors.accent : colors.inkSoft}
-              />
-              <Text style={[styles.settingLabel, s.danger && { color: colors.accent }]}>
-                {s.label}
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            </Pressable>
-          ))}
-        </Card>
+        {/* Settings — plain rows, gray line icons */}
+        {SECTIONS.map((section) => (
+          <View key={section.key} style={styles.group}>
+            {section.rows.map((row, i) => (
+              <Pressable
+                key={row.id}
+                onPress={() => onRowPress(row.id)}
+                style={({ pressed }) => [
+                  styles.row,
+                  i < section.rows.length - 1 && styles.rowBorder,
+                  pressed && styles.rowPressed,
+                ]}
+              >
+                <Ionicons
+                  name={row.icon}
+                  size={22}
+                  color={row.danger ? colors.accent : colors.inkSoft}
+                />
+                <Text style={[styles.rowLabel, row.danger && { color: colors.accent }]}>
+                  {row.label}
+                </Text>
+                {!row.danger ? (
+                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                ) : null}
+              </Pressable>
+            ))}
+          </View>
+        ))}
 
         <Text style={styles.version}>Synq · v0.1.0</Text>
       </ScrollView>
@@ -113,47 +130,55 @@ function Stat({ value, label }) {
 }
 
 const styles = StyleSheet.create({
-  content: {
+  content: { paddingBottom: 120 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: 120,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
-  title: {
-    ...type.display,
-    color: colors.ink,
-    marginBottom: spacing.xl,
+  headerText: { flex: 1 },
+  headerName: { ...type.title, color: colors.onPrimary },
+  headerSub: { ...type.caption, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  headerRole: {
+    ...type.label,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: spacing.sm,
   },
-  identity: { alignItems: 'center', marginBottom: spacing.xl },
-  name: { ...type.title, color: colors.ink, marginTop: spacing.md },
-  email: { ...type.caption, color: colors.muted, marginTop: 2 },
-  badge: { marginTop: spacing.md },
-  statsCard: {
+  stats: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadow.card,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   stat: { flex: 1, alignItems: 'center' },
-  statValue: { ...type.title, fontSize: 26, color: colors.ink },
+  statValue: { ...type.title, fontSize: 22, color: colors.ink },
   statLabel: { ...type.caption, color: colors.muted, marginTop: 3 },
-  vDivider: { width: 1, height: 32, backgroundColor: colors.divider },
-  section: { marginTop: spacing.xs },
-  settingRow: {
+  vDivider: { width: 1, height: 28, backgroundColor: colors.divider },
+  group: {
+    backgroundColor: colors.surface,
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
-  settingBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
-  pressed: { backgroundColor: colors.surfaceAlt },
-  settingLabel: {
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  rowPressed: { backgroundColor: colors.surfaceAlt },
+  rowLabel: {
     ...type.body,
     color: colors.ink,
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.lg,
   },
   version: {
     ...type.caption,
