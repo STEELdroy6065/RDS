@@ -187,22 +187,13 @@ function ModuleCard({ module, onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.moduleCard,
-        module.comingSoon && styles.moduleCardSoon,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.moduleCard, pressed && styles.pressed]}
     >
       <View style={[styles.moduleIcon, { backgroundColor: module.bg }]}>
         <Ionicons name={module.icon} size={22} color={module.fg} />
       </View>
       <Text style={styles.moduleTitle}>{module.title}</Text>
       <Text style={styles.moduleSub}>{module.subtitle}</Text>
-      {module.comingSoon ? (
-        <View style={styles.soonTag}>
-          <Text style={styles.soonTagText}>SOON</Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 }
@@ -245,6 +236,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
     marginBottom: spacing.lg,
@@ -259,6 +252,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: spacing.md,
     borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   codeHint: {
     ...type.bodyStrong,
@@ -308,12 +303,6 @@ const styles = StyleSheet.create({
     marginBottom: CARD_GAP,
     ...shadow.card,
   },
-  moduleCardSoon: {
-    borderStyle: 'dashed',
-    borderColor: colors.success,
-    backgroundColor: colors.successSoft,
-    ...({ shadowOpacity: 0, elevation: 0 }),
-  },
   pressed: {
     transform: [{ scale: 0.98 }],
     opacity: 0.95,
@@ -334,19 +323,5 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.muted,
     marginTop: 2,
-  },
-  soonTag: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.success,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  soonTagText: {
-    ...type.label,
-    fontSize: 9,
-    color: colors.onPrimary,
   },
 });
