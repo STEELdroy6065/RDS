@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Screen from '../../components/Screen';
 import Avatar from '../../components/Avatar';
-import Header from '../../components/Header';
 import { colors, spacing, radius, type, roleTheme } from '../../theme';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../state/session';
@@ -39,21 +39,57 @@ export default function FeedScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
   const insets = useSafeAreaInsets();
   const { user } = useSession();
-  const { roleForGroup } = useGroups();
+  const { roleForGroup, getGroup } = useGroups();
 
   const role = roleForGroup(groupId);
   const isModerator = role === 'Admin' || role === 'Captain';
+  const group = getGroup(groupId);
+  const memberCount = group ? group.members : 0;
+  // Members can post unless an Admin has turned that off (moderators always can).
+  const canPost = isModerator || (group ? group.allowMemberPost : true);
 
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [announce, setAnnounce] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // Chat header controls
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [muted, setMuted] = useState(false);
+
   // Long-press action menu + report modal
   const [menuPost, setMenuPost] = useState(null);
   const [reportPost, setReportPost] = useState(null);
   const [reason, setReason] = useState('');
   const [reporting, setReporting] = useState(false);
+
+  // Per-group mute is a local preference for now (persisted on-device).
+  const muteKey = `mute:${groupId}`;
+  useEffect(() => {
+    AsyncStorage.getItem(muteKey).then((v) => setMuted(v === '1'));
+  }, [muteKey]);
+
+  function toggleMute() {
+    const next = !muted;
+    setMuted(next);
+    AsyncStorage.setItem(muteKey, next ? '1' : '0');
+    setMenuOpen(false);
+    notify({
+      title: next ? 'Muted' : 'Unmuted',
+      message: next
+        ? 'You won’t be notified about this group.'
+        : 'Notifications are on for this group.',
+    });
+  }
+
+  // Filter the feed when searching (skips deleted placeholders).
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return messages;
+    return messages.filter((m) => !m.deleted && (m.text || '').toLowerCase().includes(q));
+  }, [messages, query]);
 
   const canDelete = (post) => post.author_id === user.id || isModerator;
 
@@ -128,22 +164,51 @@ export default function FeedScreen({ route, navigation }) {
 
   return (
     <Screen>
-      <Header
-        title={groupName}
-        subtitle="Feed"
-        onBack={() => navigation.goBack()}
-        right={
-          isModerator ? (
-            <Pressable
-              onPress={() => navigation.navigate('ReportedPosts', { groupId, groupName })}
-              hitSlop={10}
-              style={({ pressed }) => [styles.modBtn, pressed && styles.pressed]}
-            >
-              <Ionicons name="flag-outline" size={18} color={colors.accent} />
-            </Pressable>
-          ) : null
-        }
-      />
+      {/* Chat header: back · avatar · name/member-count · 3-dot menu */}
+      <View style={styles.chatHeader}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.hBack}>
+          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+        </Pressable>
+        <Pressable
+          style={styles.hCenter}
+          onPress={() => navigation.navigate('GroupDetail', { groupId })}
+        >
+          <Avatar emoji={group ? group.emoji : undefined} name={groupName} size={36} ring={roleTheme(role).ring} />
+          <View style={styles.hText}>
+            <Text style={styles.hName} numberOfLines={1}>{groupName}</Text>
+            <Text style={styles.hSub} numberOfLines={1}>
+              {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} style={styles.hMenu}>
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.ink} />
+        </Pressable>
+      </View>
+
+      {searchOpen ? (
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+            placeholder="Search messages"
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          <Pressable
+            onPress={() => {
+              setSearchOpen(false);
+              setQuery('');
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -151,7 +216,7 @@ export default function FeedScreen({ route, navigation }) {
         keyboardVerticalOffset={8}
       >
         <FlatList
-          data={messages}
+          data={shown}
           inverted
           style={styles.flex}
           keyExtractor={(m) => m.id}
@@ -166,44 +231,101 @@ export default function FeedScreen({ route, navigation }) {
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="chatbubbles-outline" size={30} color={colors.muted} />
-              <Text style={styles.emptyText}>No messages yet — say hello.</Text>
+              <Ionicons
+                name={query ? 'search-outline' : 'chatbubbles-outline'}
+                size={30}
+                color={colors.muted}
+              />
+              <Text style={styles.emptyText}>
+                {query ? 'No messages match your search.' : 'No messages yet — say hello.'}
+              </Text>
             </View>
           }
         />
 
-        {/* Input bar */}
-        <View style={[styles.inputBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.sm }]}>
-          {isModerator ? (
+        {/* Input bar — hidden when an Admin has disabled member posting. */}
+        {canPost ? (
+          <View style={[styles.inputBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.sm }]}>
+            {isModerator ? (
+              <Pressable
+                onPress={() => setAnnounce((a) => !a)}
+                hitSlop={8}
+                style={[styles.announceBtn, announce && styles.announceOn]}
+              >
+                <Ionicons
+                  name="megaphone-outline"
+                  size={18}
+                  color={announce ? colors.onPrimary : colors.muted}
+                />
+              </Pressable>
+            ) : null}
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={announce ? 'Write an announcement…' : 'Message'}
+              placeholderTextColor={colors.muted}
+              style={[styles.input, announce && styles.inputAnnounce]}
+              multiline
+            />
             <Pressable
-              onPress={() => setAnnounce((a) => !a)}
-              hitSlop={8}
-              style={[styles.announceBtn, announce && styles.announceOn]}
+              onPress={send}
+              disabled={!text.trim() || sending}
+              style={[styles.sendBtn, (!text.trim() || sending) && styles.sendDisabled]}
             >
-              <Ionicons
-                name="megaphone-outline"
-                size={18}
-                color={announce ? colors.onPrimary : colors.muted}
-              />
+              <Ionicons name="arrow-up" size={20} color={colors.onPrimary} />
             </Pressable>
-          ) : null}
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={announce ? 'Write an announcement…' : 'Message'}
-            placeholderTextColor={colors.muted}
-            style={[styles.input, announce && styles.inputAnnounce]}
-            multiline
-          />
-          <Pressable
-            onPress={send}
-            disabled={!text.trim() || sending}
-            style={[styles.sendBtn, (!text.trim() || sending) && styles.sendDisabled]}
-          >
-            <Ionicons name="arrow-up" size={20} color={colors.onPrimary} />
-          </Pressable>
-        </View>
+          </View>
+        ) : (
+          <View style={[styles.lockedBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.md }]}>
+            <Ionicons name="lock-closed-outline" size={15} color={colors.muted} />
+            <Text style={styles.lockedText}>Only admins and captains can post in this group.</Text>
+          </View>
+        )}
       </KeyboardAvoidingView>
+
+      {/* 3-dot header menu */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.hMenuBackdrop} onPress={() => setMenuOpen(false)}>
+          <Pressable style={[styles.hMenuCard, { top: insets.top + 48 }]} onPress={() => {}}>
+            <HeaderMenuRow
+              icon="information-circle-outline"
+              label="Group info"
+              onPress={() => {
+                setMenuOpen(false);
+                navigation.navigate('GroupDetail', { groupId });
+              }}
+            />
+            <HeaderMenuRow
+              icon="search-outline"
+              label="Search messages"
+              onPress={() => {
+                setMenuOpen(false);
+                setSearchOpen(true);
+              }}
+            />
+            <HeaderMenuRow
+              icon={muted ? 'notifications-off-outline' : 'notifications-outline'}
+              label={muted ? 'Unmute notifications' : 'Mute notifications'}
+              onPress={toggleMute}
+            />
+            {isModerator ? (
+              <HeaderMenuRow
+                icon="flag-outline"
+                label="Reported posts"
+                onPress={() => {
+                  setMenuOpen(false);
+                  navigation.navigate('ReportedPosts', { groupId, groupName });
+                }}
+              />
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Long-press action menu */}
       <Modal
@@ -293,6 +415,18 @@ export default function FeedScreen({ route, navigation }) {
   );
 }
 
+function HeaderMenuRow({ icon, label, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.hMenuItem, pressed && styles.hMenuItemPressed]}
+    >
+      <Ionicons name={icon} size={19} color={colors.inkSoft} />
+      <Text style={styles.hMenuLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function Bubble({ post, own, onLongPress }) {
   const isAnnouncement = post.type === 'Announcement';
   const amber = roleTheme('Admin');
@@ -351,14 +485,85 @@ function Bubble({ post, own, onLongPress }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  modBtn: {
-    width: 38,
+
+  // chat header
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    gap: spacing.xs,
+  },
+  hBack: {
+    width: 32,
     height: 38,
-    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
   },
+  hCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  hText: { flex: 1 },
+  hName: { ...type.heading, color: colors.ink },
+  hSub: { ...type.caption, color: colors.muted, marginTop: 1 },
+  hMenu: {
+    width: 32,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: { ...type.body, flex: 1, color: colors.ink, padding: 0 },
+
+  // 3-dot header menu
+  hMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' },
+  hMenuCard: {
+    position: 'absolute',
+    right: spacing.md,
+    width: 232,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+  },
+  hMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  hMenuItemPressed: { backgroundColor: colors.surfaceAlt },
+  hMenuLabel: { ...type.body, color: colors.ink },
+
+  // locked composer (member posting disabled)
+  lockedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    backgroundColor: colors.bg,
+  },
+  lockedText: { ...type.caption, color: colors.muted },
+
   list: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexGrow: 1 },
   empty: {
     alignItems: 'center',

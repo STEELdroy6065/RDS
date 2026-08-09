@@ -30,7 +30,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
 
 ### 2. Create the database schema
 
-In the Supabase dashboard → **SQL Editor**, run these two files (in order):
+In the Supabase dashboard → **SQL Editor**, run these files (in order):
 
 1. [`supabase/schema.sql`](supabase/schema.sql) — `groups` + `memberships` tables and RLS.
 2. [`supabase/votes.sql`](supabase/votes.sql) — `votes`, `vote_options`, `vote_ballots` tables, RLS, and helper functions.
@@ -39,6 +39,7 @@ In the Supabase dashboard → **SQL Editor**, run these two files (in order):
 5. [`supabase/reports.sql`](supabase/reports.sql) — `post_reports` table, RLS, and a post-delete (moderation) policy.
 6. [`supabase/notifications.sql`](supabase/notifications.sql) — `notifications` table, RLS, and the triggers/function that populate it.
 7. [`supabase/deletions.sql`](supabase/deletions.sql) — deletion controls: a `deleted` column + `delete_post()` for messages, and leave/delete-group and delete-vote RLS policies.
+8. [`supabase/group_info.sql`](supabase/group_info.sql) — a group `description` column, Admin-configurable member-permission toggles (post / invite / view members), a `groups` update policy, and server-side enforcement of the "members can post" toggle.
 
 Each is idempotent (safe to re-run).
 
@@ -184,6 +185,8 @@ supabase/
   feed.sql                 Posts table + RLS
   reports.sql              Post reports table + RLS + moderation delete
   notifications.sql        Notifications table + RLS + triggers/function
+  deletions.sql            Soft-delete messages + leave/delete policies
+  group_info.sql           Group description + member permission toggles
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 

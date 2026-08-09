@@ -23,6 +23,8 @@ import MembersScreen from '../screens/modules/MembersScreen';
 import AttendanceScreen from '../screens/modules/AttendanceScreen';
 import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
+import MediaLinksScreen from '../screens/modules/MediaLinksScreen';
+import GroupPermissionsScreen from '../screens/modules/GroupPermissionsScreen';
 import GroupRail from '../components/GroupRail';
 
 import { colors } from '../theme';
@@ -91,6 +93,8 @@ export default function RootNavigator() {
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
             <Stack.Screen name="Feed" component={FeedScreen} />
             <Stack.Screen name="ReportedPosts" component={ReportedPostsScreen} />
+            <Stack.Screen name="MediaLinks" component={MediaLinksScreen} />
+            <Stack.Screen name="GroupPermissions" component={GroupPermissionsScreen} />
             <Stack.Screen name="Votes" component={VotesScreen} />
             <Stack.Screen name="VoteDetail" component={VoteDetailScreen} />
             <Stack.Screen name="NewVote" component={NewVoteScreen} />

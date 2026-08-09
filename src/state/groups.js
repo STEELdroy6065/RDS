@@ -46,10 +46,27 @@ export function GroupsProvider({ children }) {
     setLoading(true);
 
     // 1) My memberships + the group each one points at (RLS scopes this to me).
-    const { data: mine, error } = await supabase
+    // Select the full column set first; if the group_info.sql migration hasn't
+    // been run yet those columns won't exist, so fall back to the base set and
+    // let the mapping supply defaults (rather than breaking group loading).
+    const FULL_GROUP =
+      'group:groups(id, name, type, created_by, created_at, check_in_deadline, description, allow_member_post, allow_member_invite, allow_member_view_members)';
+    const BASE_GROUP =
+      'group:groups(id, name, type, created_by, created_at, check_in_deadline)';
+
+    let { data: mine, error } = await supabase
       .from('memberships')
-      .select('role, group:groups(id, name, type, created_by, created_at, check_in_deadline)')
+      .select(`role, ${FULL_GROUP}`)
       .eq('user_id', user.id);
+
+    if (error) {
+      const retry = await supabase
+        .from('memberships')
+        .select(`role, ${BASE_GROUP}`)
+        .eq('user_id', user.id);
+      mine = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       setLoading(false);
@@ -91,6 +108,11 @@ export function GroupsProvider({ children }) {
       emoji: emojiForType(m.group.type),
       kind: kindForType(m.group.type),
       checkInDeadline: m.group.check_in_deadline || '09:00',
+      description: m.group.description || '',
+      // Member permission toggles (default on if the column is absent/null).
+      allowMemberPost: m.group.allow_member_post !== false,
+      allowMemberInvite: m.group.allow_member_invite !== false,
+      allowMemberViewMembers: m.group.allow_member_view_members !== false,
     }));
 
     setGroups(mapped);
@@ -156,6 +178,31 @@ export function GroupsProvider({ children }) {
 
         await load();
         return groupId;
+      },
+
+      // Update the group's description (Admin only, enforced by RLS).
+      updateDescription: async (groupId, description) => {
+        const { error } = await supabase
+          .from('groups')
+          .update({ description: description.trim() || null })
+          .eq('id', groupId);
+        if (error) throw error;
+        await load();
+      },
+
+      // Update the member-permission toggles (Admin only, enforced by RLS).
+      // Accepts a partial object of { allowMemberPost, allowMemberInvite,
+      // allowMemberViewMembers } and writes the matching columns.
+      updatePermissions: async (groupId, changes) => {
+        const patch = {};
+        if ('allowMemberPost' in changes) patch.allow_member_post = changes.allowMemberPost;
+        if ('allowMemberInvite' in changes) patch.allow_member_invite = changes.allowMemberInvite;
+        if ('allowMemberViewMembers' in changes)
+          patch.allow_member_view_members = changes.allowMemberViewMembers;
+        if (Object.keys(patch).length === 0) return;
+        const { error } = await supabase.from('groups').update(patch).eq('id', groupId);
+        if (error) throw error;
+        await load();
       },
 
       // Leave a group — remove your own membership.

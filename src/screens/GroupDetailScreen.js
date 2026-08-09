@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import Screen from '../components/Screen';
@@ -11,45 +11,23 @@ import { colors, spacing, radius, type, shadow, roleTheme } from '../theme';
 import { useGroups } from '../state/groups';
 import { confirm, notify } from '../lib/confirm';
 
+const APP_ROLES = ['Admin', 'Captain', 'Member'];
+
 const MODULES = [
-  {
-    key: 'Feed',
-    title: 'Feed',
-    subtitle: 'Posts & announcements',
-    icon: 'chatbubbles-outline',
-    bg: colors.surfaceAlt,
-    fg: colors.inkSoft,
-  },
-  {
-    key: 'Votes',
-    title: 'Votes',
-    subtitle: 'Polls & decisions',
-    icon: 'bar-chart-outline',
-    bg: colors.surfaceAlt,
-    fg: colors.inkSoft,
-  },
-  {
-    key: 'Members',
-    title: 'Members',
-    subtitle: 'Roster & roles',
-    icon: 'people-outline',
-    bg: colors.surfaceAlt,
-    fg: colors.inkSoft,
-  },
-  {
-    key: 'Attendance',
-    title: 'Attendance',
-    subtitle: 'Roll & check-ins',
-    icon: 'calendar-outline',
-    bg: colors.surfaceAlt,
-    fg: colors.inkSoft,
-  },
+  { key: 'Feed', title: 'Feed', subtitle: 'Posts & announcements', icon: 'chatbubbles-outline' },
+  { key: 'Votes', title: 'Votes', subtitle: 'Polls & decisions', icon: 'bar-chart-outline' },
+  { key: 'Members', title: 'Members', subtitle: 'Roster & roles', icon: 'people-outline' },
+  { key: 'Attendance', title: 'Attendance', subtitle: 'Roll & check-ins', icon: 'calendar-outline' },
 ];
 
 export default function GroupDetailScreen({ route, navigation }) {
   const { groupId } = route.params;
-  const { getGroup, leaveGroup, deleteGroup } = useGroups();
+  const { getGroup, membersForGroup, leaveGroup, deleteGroup, updateDescription } = useGroups();
   const group = getGroup(groupId);
+
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
+  const [savingDesc, setSavingDesc] = useState(false);
 
   function onLeave() {
     confirm({
@@ -86,10 +64,22 @@ export default function GroupDetailScreen({ route, navigation }) {
     });
   }
 
+  async function saveDesc() {
+    setSavingDesc(true);
+    try {
+      await updateDescription(groupId, descDraft);
+      setEditingDesc(false);
+    } catch (e) {
+      notify({ title: 'Could not save', message: e && e.message });
+    } finally {
+      setSavingDesc(false);
+    }
+  }
+
   if (!group) {
     return (
       <Screen>
-        <Header title="Group" onBack={() => navigation.goBack()} />
+        <Header title="Group info" onBack={() => navigation.goBack()} />
         <View style={styles.groupHead}>
           <Text style={styles.meta}>This group is no longer available.</Text>
         </View>
@@ -97,17 +87,21 @@ export default function GroupDetailScreen({ route, navigation }) {
     );
   }
 
+  const isAdmin = group.role === 'Admin';
+  const isModerator = group.role === 'Admin' || group.role === 'Captain';
+  const canInvite = isModerator || group.allowMemberInvite;
+  const canViewMembers = isModerator || group.allowMemberViewMembers;
+  const members = membersForGroup(groupId);
+  const modules = MODULES.filter((m) => m.key !== 'Members' || canViewMembers);
+
   return (
     <Screen>
-      <Header title="Group" onBack={() => navigation.goBack()} />
+      <Header title="Group info" onBack={() => navigation.goBack()} />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Group header */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 1. Identity + editable description */}
         <View style={styles.groupHead}>
-          <Avatar emoji={group.emoji} name={group.name} size={72} ring={roleTheme(group.role).ring} />
+          <Avatar emoji={group.emoji} name={group.name} size={84} ring={roleTheme(group.role).ring} />
           <Text style={styles.groupName}>{group.name}</Text>
           <View style={styles.metaRow}>
             <RoleBadge role={group.role} />
@@ -117,41 +111,130 @@ export default function GroupDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Invite code — share so others can join this group */}
-        <View style={styles.codeCard}>
-          <Text style={styles.codeLabel}>Invite to this group</Text>
-          <View style={styles.qrTile}>
-            <QRCode
-              value={group.id}
-              size={168}
-              color="#000000"
-              backgroundColor="#FFFFFF"
-            />
-          </View>
-          <Text style={styles.codeHint}>Scan this to join · {group.name}</Text>
-          <Text style={styles.codeValue} selectable numberOfLines={1}>
-            {group.id}
-          </Text>
+        <View style={styles.descCard}>
+          {editingDesc ? (
+            <>
+              <TextInput
+                value={descDraft}
+                onChangeText={setDescDraft}
+                placeholder="Add a group description…"
+                placeholderTextColor={colors.muted}
+                style={styles.descInput}
+                multiline
+                autoFocus
+              />
+              <View style={styles.descActions}>
+                <Pressable
+                  onPress={() => setEditingDesc(false)}
+                  style={({ pressed }) => [styles.descBtn, pressed && styles.pressed]}
+                >
+                  <Text style={styles.descCancel}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={saveDesc}
+                  disabled={savingDesc}
+                  style={({ pressed }) => [styles.descBtn, styles.descSave, pressed && styles.pressed]}
+                >
+                  <Text style={styles.descSaveText}>{savingDesc ? 'Saving…' : 'Save'}</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <View style={styles.descRow}>
+              <Text style={[styles.descText, !group.description && styles.descEmpty]}>
+                {group.description || (isAdmin ? 'Add a group description…' : 'No description yet.')}
+              </Text>
+              {isAdmin ? (
+                <Pressable
+                  onPress={() => {
+                    setDescDraft(group.description || '');
+                    setEditingDesc(true);
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.descEdit, pressed && styles.pressed]}
+                >
+                  <Ionicons name="pencil" size={16} color={colors.inkSoft} />
+                </Pressable>
+              ) : null}
+            </View>
+          )}
         </View>
 
-        {/* Module grid */}
+        {/* 2. Invite QR / code */}
+        {canInvite ? (
+          <View style={styles.codeCard}>
+            <Text style={styles.codeLabel}>Invite to this group</Text>
+            <View style={styles.qrTile}>
+              <QRCode value={group.id} size={168} color="#000000" backgroundColor="#FFFFFF" />
+            </View>
+            <Text style={styles.codeHint}>Scan this to join · {group.name}</Text>
+            <Text style={styles.codeValue} selectable numberOfLines={1}>
+              {group.id}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* 3. Module row */}
         <View style={styles.grid}>
-          {MODULES.map((m) => (
+          {modules.map((m) => (
             <ModuleCard
               key={m.key}
               module={m}
               onPress={() =>
-                navigation.navigate(m.key, {
-                  groupId: group.id,
-                  groupName: group.name,
-                })
+                navigation.navigate(m.key, { groupId: group.id, groupName: group.name })
               }
             />
           ))}
         </View>
 
-        {/* Group settings — leave / delete */}
-        <Text style={styles.settingsLabel}>Group settings</Text>
+        {/* 4. Media & links */}
+        <InfoRow
+          icon="images-outline"
+          title="Media & links"
+          subtitle="Images and links shared in Feed"
+          onPress={() =>
+            navigation.navigate('MediaLinks', { groupId: group.id, groupName: group.name })
+          }
+        />
+
+        {/* 5. Member list */}
+        {canViewMembers ? (
+          <>
+            <Text style={styles.sectionLabel}>
+              {members.length} {members.length === 1 ? 'member' : 'members'}
+            </Text>
+            <View style={styles.memberCard}>
+              {members.map((m, i) => {
+                const isAppRole = APP_ROLES.includes(m.role);
+                const ring = isAppRole ? roleTheme(m.role).ring : undefined;
+                return (
+                  <View
+                    key={m.id}
+                    style={[styles.memberRow, i < members.length - 1 && styles.memberBorder]}
+                  >
+                    <Avatar name={m.name} size={38} ring={ring} />
+                    <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>
+                    {isAppRole ? <RoleBadge role={m.role} /> : <Badge label={m.role} tone="neutral" />}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+
+        {/* 6. Group settings */}
+        <Text style={styles.sectionLabel}>Group settings</Text>
+
+        {isAdmin ? (
+          <InfoRow
+            icon="options-outline"
+            title="Group permissions"
+            subtitle="Control what members can do"
+            onPress={() =>
+              navigation.navigate('GroupPermissions', { groupId: group.id, groupName: group.name })
+            }
+          />
+        ) : null}
 
         <Pressable
           onPress={onLeave}
@@ -165,7 +248,7 @@ export default function GroupDetailScreen({ route, navigation }) {
           <Ionicons name="chevron-forward" size={18} color={colors.muted} />
         </Pressable>
 
-        {group.role === 'Admin' ? (
+        {isAdmin ? (
           <Pressable
             onPress={onDelete}
             style={({ pressed }) => [styles.actionRow, styles.dangerRow, pressed && styles.actionPressed]}
@@ -189,11 +272,27 @@ function ModuleCard({ module, onPress }) {
       onPress={onPress}
       style={({ pressed }) => [styles.moduleCard, pressed && styles.pressed]}
     >
-      <View style={[styles.moduleIcon, { backgroundColor: module.bg }]}>
-        <Ionicons name={module.icon} size={22} color={module.fg} />
+      <View style={styles.moduleIcon}>
+        <Ionicons name={module.icon} size={22} color={colors.inkSoft} />
       </View>
       <Text style={styles.moduleTitle}>{module.title}</Text>
       <Text style={styles.moduleSub}>{module.subtitle}</Text>
+    </Pressable>
+  );
+}
+
+function InfoRow({ icon, title, subtitle, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}
+    >
+      <Ionicons name={icon} size={20} color={colors.inkSoft} />
+      <View style={styles.actionBody}>
+        <Text style={styles.actionTitle}>{title}</Text>
+        <Text style={styles.actionSub}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </Pressable>
   );
 }
@@ -208,7 +307,6 @@ const styles = StyleSheet.create({
   groupHead: {
     alignItems: 'center',
     paddingVertical: spacing.lg,
-    marginBottom: spacing.lg,
   },
   groupName: {
     ...type.title,
@@ -228,10 +326,35 @@ const styles = StyleSheet.create({
     backgroundColor: colors.muted,
     marginHorizontal: spacing.sm,
   },
-  meta: {
-    ...type.caption,
-    color: colors.muted,
+  meta: { ...type.caption, color: colors.muted },
+
+  // description
+  descCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
+  descRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  descText: { ...type.body, color: colors.ink, flex: 1, lineHeight: 21 },
+  descEmpty: { color: colors.muted },
+  descEdit: { marginLeft: spacing.md, padding: 2 },
+  descInput: {
+    ...type.body,
+    color: colors.ink,
+    minHeight: 56,
+    textAlignVertical: 'top',
+    lineHeight: 21,
+  },
+  descActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
+  descBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill },
+  descCancel: { ...type.bodyStrong, color: colors.inkSoft },
+  descSave: { backgroundColor: colors.primary },
+  descSaveText: { ...type.bodyStrong, color: colors.onPrimary },
+
+  // invite QR
   codeCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
@@ -243,11 +366,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadow.card,
   },
-  codeLabel: {
-    ...type.label,
-    color: colors.muted,
-    marginBottom: spacing.lg,
-  },
+  codeLabel: { ...type.label, color: colors.muted, marginBottom: spacing.lg },
   qrTile: {
     backgroundColor: '#FFFFFF',
     padding: spacing.md,
@@ -255,29 +374,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  codeHint: {
-    ...type.bodyStrong,
-    fontSize: 13,
-    color: colors.ink,
-    marginTop: spacing.lg,
+  codeHint: { ...type.bodyStrong, fontSize: 13, color: colors.ink, marginTop: spacing.lg },
+  codeValue: { ...type.caption, color: colors.muted, marginTop: spacing.xs, fontSize: 11 },
+
+  // module grid
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  moduleCard: {
+    width: '48.5%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: CARD_GAP,
+    ...shadow.card,
   },
-  codeValue: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: spacing.xs,
-    fontSize: 11,
+  pressed: { transform: [{ scale: 0.98 }], opacity: 0.95 },
+  moduleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  settingsLabel: {
+  moduleTitle: { ...type.heading, color: colors.ink },
+  moduleSub: { ...type.caption, color: colors.muted, marginTop: 2 },
+
+  // section label
+  sectionLabel: {
     ...type.label,
     color: colors.muted,
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
+
+  // member list
+  memberCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+  },
+  memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+  memberBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  memberName: {
+    ...type.bodyStrong,
+    color: colors.ink,
+    flex: 1,
+    marginLeft: spacing.md,
+    marginRight: spacing.sm,
+  },
+
+  // action / info rows
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,35 +444,4 @@ const styles = StyleSheet.create({
   actionBody: { flex: 1, marginLeft: spacing.md },
   actionTitle: { ...type.bodyStrong, color: colors.ink },
   actionSub: { ...type.caption, color: colors.muted, marginTop: 1 },
-  moduleCard: {
-    width: '48.5%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: CARD_GAP,
-    ...shadow.card,
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.95,
-  },
-  moduleIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  moduleTitle: {
-    ...type.heading,
-    color: colors.ink,
-  },
-  moduleSub: {
-    ...type.caption,
-    color: colors.muted,
-    marginTop: 2,
-  },
 });
