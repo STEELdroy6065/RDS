@@ -1,9 +1,9 @@
-# Synq
+# RDS
 
 **Intelligent group coordination for schools, clubs, and teams** — attendance,
 communication, and voting in one place.
 
-Synq is a React Native (Expo) app backed by **Supabase** (Auth + Postgres with
+RDS is a React Native (Expo) app backed by **Supabase** (Auth + Postgres with
 Row Level Security). Accounts, groups/membership, votes, attendance, and the
 feed are all real; every module reads and writes real data.
 
@@ -65,19 +65,19 @@ npm run android    # Android emulator
 
 ## What's in the skeleton
 
-The app opens into an onboarding flow, then a **Discord-style shell**: a
-persistent left **group rail** (`GroupRail`) for switching groups, and the main
-content with a **floating pill bottom bar** (`FloatingTabBar`) of just Home /
-Alerts / Profile.
+The app opens into an onboarding flow, then a **Replit-inspired shell**: a
+persistent left **group rail** (`GroupRail`) for switching groups, and a clean
+main view with **no bottom tab bar**. Home is the default; Alerts is reached
+via the header bell, and Profile / account settings via the header avatar menu.
 
 | Area | Screen | Notes |
 | --- | --- | --- |
-| **Splash** | `SplashScreen` | Synq wordmark; shown while the session is restored. |
+| **Splash** | `SplashScreen` | RDS wordmark; shown while the session is restored. |
 | **Welcome** | `WelcomeScreen` | One-line pitch + "Get Started". |
 | **Sign up / Log in** | `AuthScreen` | **Real Supabase email + password auth**, with validation and error messages. |
 | **Group rail** | `GroupRail` | Always-visible vertical rail of circular group icons, ringed by your role; tap to jump into a group, `+` to create/join. |
-| **Home** | `HomeScreen` | Greeting, quick stats, and the user's real groups. |
-| **Alerts** | `AlertsScreen` | Real in-app notifications (Supabase); unread dot + tab badge; tap marks read and jumps to the vote/feed/attendance/reports. |
+| **Home** | `HomeScreen` | Header (RDS wordmark, bell with unread badge, avatar menu), centered greeting, a **search** across groups + feed messages, and the user's real groups. |
+| **Alerts** | `AlertsScreen` | Real in-app notifications (Supabase); reached from the Home bell; unread dot + badge; tap marks read and jumps to the vote/feed/attendance/reports. |
 | **New group** | `NewGroupScreen` | Create (name + template) or Join (**scan a QR** / enter a code); both add to the live groups and open the group. |
 | **Scan group** | `ScanGroupScreen` | Camera QR scanner (`expo-camera`) — scan a group's QR to join. |
 | **Alerts** | `AlertsScreen` | Mock notifications with unread state. |
@@ -137,10 +137,10 @@ Tapping a group opens its detail screen, which routes into four modules:
 App.js                     App entry (providers + navigator)
 src/
   navigation/
-    RootNavigator.js       Onboarding + group-rail shell + floating tabs + stack
+    RootNavigator.js       Onboarding + group-rail shell (Home/Alerts/Profile) + stack
   components/
     GroupRail.js           Discord-style vertical group switcher
-    FloatingTabBar.js      Floating pill bottom nav (Home / Alerts / Profile)
+    AvatarMenu.js          Header avatar dropdown (Profile + account settings)
     …                      Card, Avatar, RoleBadge, Pulse, Header, …
   screens/
     onboarding/

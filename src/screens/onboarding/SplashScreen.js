@@ -10,7 +10,7 @@ export default function SplashScreen() {
       <StatusBar style="light" />
       <View style={styles.center}>
         <Text style={styles.wordmark}>
-          Synq<Text style={styles.dot}>.</Text>
+          RDS<Text style={styles.dot}>.</Text>
         </Text>
         <Text style={styles.tagline}>Groups, in sync</Text>
       </View>

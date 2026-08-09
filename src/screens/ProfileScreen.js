@@ -24,7 +24,7 @@ const SECTIONS = [
     key: 'support',
     rows: [
       { id: 'help', icon: 'help-circle-outline', label: 'Help & support' },
-      { id: 'about', icon: 'information-circle-outline', label: 'About Synq' },
+      { id: 'about', icon: 'information-circle-outline', label: 'About RDS' },
     ],
   },
   {
@@ -67,12 +67,17 @@ export default function ProfileScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Black identity header — edge to edge */}
-        <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
-          <Avatar name={name} size={64} color="#3F4048" />
-          <View style={styles.headerText}>
-            <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
-            {email ? <Text style={styles.headerSub} numberOfLines={1}>{email}</Text> : null}
-            <Text style={styles.headerRole}>{myTopRole}</Text>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.back}>
+            <Ionicons name="chevron-back" size={24} color={colors.onPrimary} />
+          </Pressable>
+          <View style={styles.headerRow}>
+            <Avatar name={name} size={64} color="#3F4048" />
+            <View style={styles.headerText}>
+              <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
+              {email ? <Text style={styles.headerSub} numberOfLines={1}>{email}</Text> : null}
+              <Text style={styles.headerRole}>{myTopRole}</Text>
+            </View>
           </View>
         </View>
 
@@ -114,7 +119,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         ))}
 
-        <Text style={styles.version}>Synq · v0.1.0</Text>
+        <Text style={styles.version}>RDS · v0.1.0</Text>
       </ScrollView>
     </Screen>
   );
@@ -132,11 +137,14 @@ function Stat({ value, label }) {
 const styles = StyleSheet.create({
   content: { paddingBottom: 120 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  back: { marginLeft: -6, marginBottom: spacing.sm },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.lg,
   },
   headerText: { flex: 1 },

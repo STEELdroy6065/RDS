@@ -58,7 +58,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
         <View style={styles.body}>
           <Text style={styles.brand}>
-            Synq<Text style={styles.dot}>.</Text>
+            RDS<Text style={styles.dot}>.</Text>
           </Text>
 
           {sent ? (

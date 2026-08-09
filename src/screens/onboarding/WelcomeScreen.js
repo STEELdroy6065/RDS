@@ -16,7 +16,7 @@ export default function WelcomeScreen({ navigation }) {
       <View style={styles.content}>
         <View style={styles.top}>
           <Text style={styles.brand}>
-            Synq<Text style={styles.dot}>.</Text>
+            RDS<Text style={styles.dot}>.</Text>
           </Text>
 
           <View style={styles.hero}>

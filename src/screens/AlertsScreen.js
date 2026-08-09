@@ -73,7 +73,12 @@ export default function AlertsScreen({ navigation }) {
         }
       >
         <View style={styles.head}>
-          <Text style={styles.title}>Alerts</Text>
+          <View style={styles.headLeft}>
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.back}>
+              <Ionicons name="chevron-back" size={24} color={colors.ink} />
+            </Pressable>
+            <Text style={styles.title}>Alerts</Text>
+          </View>
           <View style={styles.headRight}>
             {unreadCount > 0 ? (
               <Pressable onPress={markAllRead} hitSlop={8}>
@@ -140,6 +145,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
+  headLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  back: { marginLeft: -6 },
   title: { ...type.display, color: colors.ink },
   headRight: { flexDirection: 'row', alignItems: 'center' },
   markAll: { ...type.bodyStrong, fontSize: 13, color: colors.primary },

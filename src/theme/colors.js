@@ -1,4 +1,4 @@
-// Synq palette — clean, professional, monochrome.
+// RDS palette — clean, professional, monochrome.
 // White canvas, near-black ink, restrained grays, black as the primary accent.
 // Color is used sparingly (red only for destructive/attention).
 

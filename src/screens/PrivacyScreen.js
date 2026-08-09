@@ -24,7 +24,7 @@ export default function PrivacyScreen({ navigation }) {
       >
         <Text style={styles.title}>Your data, in plain language</Text>
         <Text style={styles.intro}>
-          Synq only collects what it needs to run your groups. We don’t sell your
+          RDS only collects what it needs to run your groups. We don’t sell your
           data or use it for advertising. Here’s exactly what’s stored:
         </Text>
 
@@ -63,11 +63,11 @@ export default function PrivacyScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Your control</Text>
         <Text style={styles.para}>
           You can log out any time from your Profile. This is an early version of
-          Synq; this notice explains current behavior in plain terms and isn’t a
+          RDS; this notice explains current behavior in plain terms and isn’t a
           formal legal agreement.
         </Text>
 
-        <Text style={styles.footer}>Synq · Privacy notice</Text>
+        <Text style={styles.footer}>RDS · Privacy notice</Text>
       </ScrollView>
     </Screen>
   );

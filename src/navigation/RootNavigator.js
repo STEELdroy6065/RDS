@@ -2,7 +2,6 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -25,12 +24,11 @@ import AttendanceScreen from '../screens/modules/AttendanceScreen';
 import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
 import GroupRail from '../components/GroupRail';
-import FloatingTabBar from '../components/FloatingTabBar';
 
 import { colors } from '../theme';
 import { useSession } from '../state/session';
 
-const Tab = createBottomTabNavigator();
+const MainStack = createNativeStackNavigator();
 const Stack = createNativeStackNavigator();
 
 const navTheme = {
@@ -45,27 +43,29 @@ const navTheme = {
   },
 };
 
-function Tabs() {
+// The three top-level views live in their own stack so the group rail stays
+// mounted across them. Home is the default; Alerts is reached via the bell and
+// Profile via the avatar menu (no bottom tab bar).
+function MainStackScreens() {
   return (
-    <Tab.Navigator
-      tabBar={(props) => <FloatingTabBar {...props} />}
-      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
+    <MainStack.Navigator
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Alerts" component={AlertsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+      <MainStack.Screen name="Home" component={HomeScreen} />
+      <MainStack.Screen name="Alerts" component={AlertsScreen} />
+      <MainStack.Screen name="Profile" component={ProfileScreen} />
+    </MainStack.Navigator>
   );
 }
 
-// Discord-style shell: persistent group rail on the left, the tabbed content
-// (with its floating pill bar) on the right.
+// Discord-style shell: persistent group rail on the left, the main content
+// (Home / Alerts / Profile) on the right.
 function MainShell() {
   return (
     <View style={styles.shell}>
       <GroupRail />
       <View style={styles.shellContent}>
-        <Tabs />
+        <MainStackScreens />
       </View>
     </View>
   );
@@ -85,7 +85,7 @@ export default function RootNavigator() {
           <Stack.Screen name="SetNewPassword" component={SetNewPasswordScreen} />
         ) : session ? (
           <>
-            <Stack.Screen name="Tabs" component={MainShell} />
+            <Stack.Screen name="Main" component={MainShell} />
             <Stack.Screen name="NewGroup" component={NewGroupScreen} />
             <Stack.Screen name="ScanGroup" component={ScanGroupScreen} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />

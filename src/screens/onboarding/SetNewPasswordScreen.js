@@ -60,7 +60,7 @@ export default function SetNewPasswordScreen() {
       >
         <View style={styles.body}>
           <Text style={styles.brand}>
-            Synq<Text style={styles.dot}>.</Text>
+            RDS<Text style={styles.dot}>.</Text>
           </Text>
           <Text style={styles.title}>Set a new password</Text>
           <Text style={styles.subtitle}>

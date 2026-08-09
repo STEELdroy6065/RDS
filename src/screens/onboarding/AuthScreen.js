@@ -100,7 +100,7 @@ export default function AuthScreen({ navigation }) {
 
         <View style={styles.body}>
           <Text style={styles.brand}>
-            Synq<Text style={styles.dot}>.</Text>
+            RDS<Text style={styles.dot}>.</Text>
           </Text>
           <Text style={styles.title}>
             {isLogin ? 'Welcome back' : 'Create your account'}
@@ -108,7 +108,7 @@ export default function AuthScreen({ navigation }) {
           <Text style={styles.subtitle}>
             {isLogin
               ? 'Log in to pick up where you left off.'
-              : 'Set up Synq in a few seconds.'}
+              : 'Set up RDS in a few seconds.'}
           </Text>
 
           <View style={styles.form}>
@@ -208,7 +208,7 @@ export default function AuthScreen({ navigation }) {
 
         <View style={styles.footer}>
           <Text style={styles.togglePrompt}>
-            {isLogin ? 'New to Synq?' : 'Already have an account?'}
+            {isLogin ? 'New to RDS?' : 'Already have an account?'}
           </Text>
           <Pressable onPress={switchMode} hitSlop={8} disabled={loading}>
             <Text style={styles.toggleLink}>{isLogin ? 'Sign up' : 'Log in'}</Text>
