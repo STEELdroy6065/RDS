@@ -200,17 +200,18 @@ export default function AssistantPanel({ visible, onClose }) {
       });
       if (error) {
         // supabase-js hides the function's real error behind a generic
-        // "non-2xx" message — the body is on error.context (a Response).
-        let detail = (error && error.message) || 'request failed';
+        // "non-2xx" message — the friendly message is on error.context (a
+        // Response). Fall back to a friendly line, never the raw/technical one.
+        let detail = '';
         try {
           if (error && error.context && typeof error.context.json === 'function') {
             const body = await error.context.json();
             if (body && body.error) detail = body.error;
           }
         } catch {
-          /* keep the generic detail */
+          /* ignore — use the friendly fallback below */
         }
-        throw new Error(detail);
+        throw new Error(detail || 'The assistant is unavailable right now — please try again in a moment.');
       }
       if (data && data.error) throw new Error(data.error);
       const reply = data && data.reply;

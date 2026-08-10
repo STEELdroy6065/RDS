@@ -142,16 +142,24 @@ export default function FeedScreen({ route, navigation }) {
       const { data, error } = await supabase.functions.invoke('catch-me-up', {
         body: { messages: payload, groupName },
       });
-      if (error) throw error;
+      if (error) {
+        // Surface the function's friendly message (on error.context), not the
+        // generic "non-2xx" string.
+        let detail = '';
+        try {
+          if (error.context && typeof error.context.json === 'function') {
+            const body = await error.context.json();
+            if (body && body.error) detail = body.error;
+          }
+        } catch {
+          /* use fallback below */
+        }
+        throw new Error(detail || 'The summary is unavailable right now — please try again in a moment.');
+      }
       if (data && data.error) throw new Error(data.error);
       setSummary((data && data.summary) || 'No summary available.');
     } catch (e) {
-      notify({
-        title: 'Summary unavailable',
-        message:
-          (e && e.message) ||
-          'Could not generate a summary. Make sure the catch-me-up function is deployed.',
-      });
+      notify({ title: 'Summary unavailable', message: (e && e.message) || 'Please try again in a moment.' });
     } finally {
       setSummarizing(false);
     }

@@ -39,6 +39,21 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// User-facing messages for upstream AI failures — never leak raw provider text
+// (model names, org IDs, quotas). The real detail is logged server-side.
+function friendlyAIError(status: number): string {
+  if (status === 429) return 'The assistant is a bit busy right now — try again in a few minutes.';
+  if (status === 401 || status === 403) return 'The assistant isn’t available right now.';
+  if (status === 400) return 'The assistant couldn’t handle that request — try rephrasing or shortening it.';
+  return 'The assistant is having trouble right now — please try again in a moment.';
+}
+
+// Thrown by provider calls; `friendly` marks it safe to show to users.
+function upstreamError(provider: string, status: number, detail: string): Error {
+  console.error(`[assistant] ${provider} ${status}: ${detail}`);
+  return Object.assign(new Error(friendlyAIError(status)), { friendly: true });
+}
+
 type Msg = { role: 'user' | 'assistant'; content: string };
 
 function systemPrompt(userName: string, context: string): string {
@@ -177,7 +192,7 @@ async function chatGroq(system: string, history: Msg[], sb: any): Promise<string
         tool_choice: 'auto',
       }),
     });
-    if (!resp.ok) throw new Error(`Groq request failed (${resp.status}): ${await resp.text()}`);
+    if (!resp.ok) throw upstreamError('groq', resp.status, await resp.text());
     const data = await resp.json();
     const msg = data?.choices?.[0]?.message;
     if (!msg) throw new Error('Groq returned no message.');
@@ -231,7 +246,7 @@ async function chatGemini(system: string, history: Msg[]): Promise<string> {
       }),
     }
   );
-  if (!resp.ok) throw new Error(`Gemini request failed (${resp.status}): ${await resp.text()}`);
+  if (!resp.ok) throw upstreamError('gemini', resp.status, await resp.text());
   const data = await resp.json();
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   return parts.map((p: any) => p?.text || '').join('').trim();
@@ -247,7 +262,7 @@ async function chatClaude(system: string, history: Msg[]): Promise<string> {
     },
     body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 800, system, messages: history }),
   });
-  if (!resp.ok) throw new Error(`Claude request failed (${resp.status}): ${await resp.text()}`);
+  if (!resp.ok) throw upstreamError('claude', resp.status, await resp.text());
   const data = await resp.json();
   return (data?.content?.[0]?.text || '').trim();
 }
@@ -259,7 +274,8 @@ Deno.serve(async (req) => {
 
   try {
     if (!GROQ_API_KEY && !GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
-      return json({ error: 'No AI key configured. Set GROQ_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.' }, 500);
+      console.error('[assistant] no AI key configured (GROQ/GEMINI/ANTHROPIC)');
+      return json({ error: 'The assistant isn’t set up yet.' }, 503);
     }
 
     const { messages, context, userName } = await req.json().catch(() => ({}));
@@ -288,9 +304,16 @@ Deno.serve(async (req) => {
       ? await chatGemini(system, history)
       : await chatClaude(system, history);
 
-    if (!reply) return json({ error: 'The AI returned an empty reply.' }, 502);
+    if (!reply) return json({ error: 'The assistant is having trouble right now — please try again in a moment.' }, 502);
     return json({ reply });
   } catch (e) {
-    return json({ error: (e as Error)?.message || 'Unexpected error.' }, 500);
+    // Friendly errors (from the AI providers) are safe to show; anything else
+    // is logged and replaced with a generic message so no raw text leaks.
+    const friendly = (e as any)?.friendly;
+    if (!friendly) console.error('[assistant] handler error:', (e as Error)?.stack || e);
+    const message = friendly
+      ? (e as Error).message
+      : 'The assistant is unavailable right now — please try again in a moment.';
+    return json({ error: message }, 500);
   }
 });

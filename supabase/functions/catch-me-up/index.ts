@@ -42,6 +42,20 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// User-facing messages for upstream AI failures — never leak raw provider text
+// (model names, org IDs, quotas). The real detail is logged server-side.
+function friendlyAIError(status: number): string {
+  if (status === 429) return 'The AI is a bit busy right now — try again in a few minutes.';
+  if (status === 401 || status === 403) return 'The summary isn’t available right now.';
+  if (status === 400) return 'Couldn’t summarize this chat — there may be too much to process.';
+  return 'The summary is having trouble right now — please try again in a moment.';
+}
+
+function upstreamError(provider: string, status: number, detail: string): Error {
+  console.error(`[catch-me-up] ${provider} ${status}: ${detail}`);
+  return Object.assign(new Error(friendlyAIError(status)), { friendly: true });
+}
+
 function lineFor(m: any): string {
   const who = m.author_name || 'Member';
   const tag = m.type === 'Announcement' ? ' (ANNOUNCEMENT)' : '';
@@ -70,7 +84,7 @@ async function summarizeWithGroq(prompt: string): Promise<string> {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
-  if (!resp.ok) throw new Error(`Groq request failed (${resp.status}): ${await resp.text()}`);
+  if (!resp.ok) throw upstreamError('groq', resp.status, await resp.text());
   const data = await resp.json();
   return (data?.choices?.[0]?.message?.content || '').trim();
 }
@@ -87,7 +101,7 @@ async function summarizeWithGemini(prompt: string): Promise<string> {
       }),
     }
   );
-  if (!resp.ok) throw new Error(`Gemini request failed (${resp.status}): ${await resp.text()}`);
+  if (!resp.ok) throw upstreamError('gemini', resp.status, await resp.text());
   const data = await resp.json();
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   return parts.map((p: any) => p?.text || '').join('').trim();
@@ -107,7 +121,7 @@ async function summarizeWithClaude(prompt: string): Promise<string> {
       messages: [{ role: 'user', content: prompt }],
     }),
   });
-  if (!resp.ok) throw new Error(`Claude request failed (${resp.status}): ${await resp.text()}`);
+  if (!resp.ok) throw upstreamError('claude', resp.status, await resp.text());
   const data = await resp.json();
   return (data?.content?.[0]?.text || '').trim();
 }
@@ -119,7 +133,8 @@ Deno.serve(async (req) => {
 
   try {
     if (!GROQ_API_KEY && !GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
-      return json({ error: 'No AI key configured. Set GROQ_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.' }, 500);
+      console.error('[catch-me-up] no AI key configured (GROQ/GEMINI/ANTHROPIC)');
+      return json({ error: 'The summary isn’t set up yet.' }, 503);
     }
 
     const { messages, groupName } = await req.json().catch(() => ({}));
@@ -144,9 +159,14 @@ Deno.serve(async (req) => {
       ? await summarizeWithGemini(prompt)
       : await summarizeWithClaude(prompt);
 
-    if (!summary) return json({ error: 'The AI returned an empty summary.' }, 502);
+    if (!summary) return json({ error: 'The summary is having trouble right now — please try again in a moment.' }, 502);
     return json({ summary });
   } catch (e) {
-    return json({ error: (e as Error)?.message || 'Unexpected error.' }, 500);
+    const friendly = (e as any)?.friendly;
+    if (!friendly) console.error('[catch-me-up] handler error:', (e as Error)?.stack || e);
+    const message = friendly
+      ? (e as Error).message
+      : 'The summary is unavailable right now — please try again in a moment.';
+    return json({ error: message }, 500);
   }
 });
