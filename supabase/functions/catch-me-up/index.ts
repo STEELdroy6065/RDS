@@ -5,14 +5,14 @@
 // can't be extracted from the public web build.
 //
 // Provider is chosen automatically (first key present wins):
-//   - GROQ_API_KEY       -> Groq (free, no billing) — llama-3.3-70b-versatile
+//   - GROQ_API_KEY       -> Groq (free, no billing) — llama-3.1-8b-instant
 //   - GEMINI_API_KEY     -> Google Gemini (free tier where available)
 //   - ANTHROPIC_API_KEY  -> Anthropic Claude (paid)
 //
 // Deploy:  supabase functions deploy catch-me-up
 // Secret (free option, Groq):
 //   supabase secrets set GROQ_API_KEY=gsk_...       # from console.groq.com/keys
-//   (optional) supabase secrets set GROQ_MODEL=llama-3.3-70b-versatile
+//   (optional) supabase secrets set GROQ_MODEL=llama-3.1-8b-instant
 // Secret (free option, Gemini):
 //   supabase secrets set GEMINI_API_KEY=...         # from aistudio.google.com/apikey
 //   (optional) supabase secrets set GEMINI_MODEL=gemini-2.0-flash
@@ -23,7 +23,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
+const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.1-8b-instant';
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');

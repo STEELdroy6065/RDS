@@ -74,7 +74,7 @@ and deploy each function.
 **Other providers** — set one of these secrets instead:
 `GEMINI_API_KEY` (Google Gemini, free tier where available) or `ANTHROPIC_API_KEY`
 (Claude, paid). If several are set the priority is Groq → Gemini → Claude. Model
-overrides: `GROQ_MODEL` (default `llama-3.3-70b-versatile`), `GEMINI_MODEL`
+overrides: `GROQ_MODEL` (default `llama-3.1-8b-instant`), `GEMINI_MODEL`
 (default `gemini-2.0-flash`), `ANTHROPIC_MODEL` (default
 `claude-3-5-haiku-latest`). Until the function is deployed, the button just shows
 a friendly "unavailable" message.
