@@ -190,7 +190,7 @@ export default function HomeScreen({ navigation }) {
             groupHits={groupHits}
             messageHits={messageHits}
             groupsById={groupsById}
-            onOpenGroup={(g) => navigation.navigate('GroupDetail', { groupId: g.id })}
+            onOpenGroup={(g) => navigation.navigate('Feed', { groupId: g.id, groupName: g.name })}
             onOpenMessage={(m) => {
               const g = groupsById[m.group_id];
               navigation.navigate('Feed', {
@@ -214,7 +214,7 @@ export default function HomeScreen({ navigation }) {
                 <GroupCard
                   key={g.id}
                   group={g}
-                  onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
+                  onPress={() => navigation.navigate('Feed', { groupId: g.id, groupName: g.name })}
                 />
               ))
             )}

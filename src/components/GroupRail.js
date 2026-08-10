@@ -37,7 +37,7 @@ export default function GroupRail() {
           return (
             <Pressable
               key={g.id}
-              onPress={() => navigation.navigate('GroupDetail', { groupId: g.id })}
+              onPress={() => navigation.navigate('Feed', { groupId: g.id, groupName: g.name })}
               style={({ pressed }) => [styles.item, pressed && styles.pressed]}
             >
               <Avatar emoji={g.emoji} name={g.name} size={46} ring={rc.ring} />
