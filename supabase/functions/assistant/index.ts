@@ -1,17 +1,21 @@
-// RDS — general AI assistant Edge Function.
+// RDS — general AI assistant Edge Function (with a search tool).
 //
 // A conversational assistant (like Gmail's Gemini panel). The client sends the
-// running conversation plus a CONTEXT blob built from the user's real data
-// (groups, open votes, today's attendance, recent feed activity). The AI key
-// lives here as a Supabase secret, never in the app bundle.
+// running conversation plus a CONTEXT blob built from the user's real data.
+// The assistant can also call a `search_rds` tool that looks up the user's
+// feed messages, shared files, votes and people — executed here, server-side,
+// scoped by RLS to the caller's own groups (via their JWT). The AI key lives
+// here as a Supabase secret, never in the app bundle.
 //
 // Shares the same secrets/providers as catch-me-up (first key present wins):
 //   GROQ_API_KEY -> Groq · GEMINI_API_KEY -> Gemini · ANTHROPIC_API_KEY -> Claude
+// (Live search is wired for Groq's tool-calling; Gemini/Claude answer from the
+//  provided context.)
 //
 // Deploy:  supabase functions deploy assistant
-// (Secrets are project-wide, so if catch-me-up already works, this does too.)
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
 const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
@@ -19,6 +23,8 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-haiku-latest';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -44,38 +50,158 @@ function systemPrompt(userName: string, context: string): string {
     `role: Admin, Captain, or Member.\n\n` +
     `You are helping ${userName || 'the user'}. Today is ${today}.\n\n` +
     `Use the CONTEXT below — it is their real, current data — to answer specifically ` +
-    `and naturally (e.g. "You have one open vote in Steel, and attendance hasn't been ` +
-    `marked in Students yet today"). If something isn't in the context, say you don't ` +
-    `have that info rather than inventing it.\n\n` +
-    `What you can do:\n` +
-    `- Answer questions about their groups, open votes, attendance, and recent messages.\n` +
-    `- Draft text on request (an announcement, a message, a poll question). Write the ` +
-    `suggested text clearly and ready to paste; keep it concise. Never claim you posted ` +
-    `or sent it — you only draft, the user pastes it into RDS themselves.\n` +
-    `- Otherwise just chat helpfully.\n\n` +
-    `What you cannot do: take actions in the app (you cannot post, vote, or mark ` +
-    `attendance). If asked, explain you can draft or guide, but they do it in the app.\n\n` +
+    `and naturally. When the user asks you to FIND or LOOK UP something specific (a ` +
+    `message, a shared file/PDF, a vote, or a person), call the search_rds tool and ` +
+    `answer from what it returns. If search returns no matches, say so plainly — never ` +
+    `invent a result. If something isn't in the context or search, say you don't have it.\n\n` +
+    `You can also draft text on request (an announcement, a message, a poll question): ` +
+    `write it ready to paste, concise, and never claim you posted or sent it — the user ` +
+    `pastes it into RDS themselves. You cannot take actions in the app (post, vote, mark ` +
+    `attendance); offer to draft or guide instead.\n\n` +
     `Keep replies concise and friendly. Plain text, no markdown headers.\n\n` +
     `CONTEXT:\n${context || '(no data available)'}`
   );
 }
 
+// --- Server-side search (scoped to the caller via RLS) ---------------------
+
+async function runSearch(sb: any, query: string): Promise<string> {
+  const q = (query || '').trim();
+  if (!q) return 'No search query was provided.';
+  const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+  const safe = async (p: any) => {
+    try {
+      const { data } = await p;
+      return data || [];
+    } catch {
+      return [];
+    }
+  };
+
+  const groups = await safe(sb.from('groups').select('id, name'));
+  const nameById: Record<string, string> = {};
+  groups.forEach((g: any) => (nameById[g.id] = g.name));
+  const gn = (id: string) => nameById[id] || 'a group';
+  const day = (iso: string) => (iso || '').slice(0, 10);
+
+  const [msgs, files, votes, people] = await Promise.all([
+    safe(
+      sb.from('posts').select('group_id, author_name, text, created_at')
+        .eq('deleted', false).ilike('text', pattern)
+        .order('created_at', { ascending: false }).limit(8)
+    ),
+    safe(
+      sb.from('posts').select('group_id, author_name, attachment_name, attachment_type, created_at')
+        .eq('deleted', false).ilike('attachment_name', pattern)
+        .order('created_at', { ascending: false }).limit(8)
+    ),
+    safe(
+      sb.from('votes').select('group_id, question, status, created_at')
+        .ilike('question', pattern)
+        .order('created_at', { ascending: false }).limit(8)
+    ),
+    safe(sb.from('posts').select('group_id, author_name').ilike('author_name', pattern).limit(30)),
+  ]);
+
+  const lines: string[] = [];
+  if (msgs.length) {
+    lines.push('Messages:');
+    msgs.forEach((m: any) =>
+      lines.push(`- in ${gn(m.group_id)}, ${m.author_name || 'someone'} on ${day(m.created_at)}: ${m.text}`)
+    );
+  }
+  if (files.length) {
+    lines.push('Files/images:');
+    files.forEach((f: any) =>
+      lines.push(
+        `- "${f.attachment_name || 'file'}" (${f.attachment_type || 'file'}) shared by ${
+          f.author_name || 'someone'
+        } in ${gn(f.group_id)} on ${day(f.created_at)}`
+      )
+    );
+  }
+  if (votes.length) {
+    lines.push('Votes:');
+    votes.forEach((v: any) =>
+      lines.push(`- "${v.question}" in ${gn(v.group_id)} — ${v.status} (created ${day(v.created_at)})`)
+    );
+  }
+  const seen = new Set<string>();
+  const ppl: string[] = [];
+  people.forEach((p: any) => {
+    if (!p.author_name) return;
+    const k = `${p.author_name}::${p.group_id}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    ppl.push(`- ${p.author_name} (active in ${gn(p.group_id)})`);
+  });
+  if (ppl.length) {
+    lines.push('People:');
+    ppl.slice(0, 10).forEach((l) => lines.push(l));
+  }
+
+  if (lines.length === 0) return `No matches found for "${q}".`;
+  return lines.join('\n');
+}
+
 // --- Providers -------------------------------------------------------------
 
-async function chatGroq(system: string, history: Msg[]): Promise<string> {
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      max_tokens: 800,
-      temperature: 0.4,
-      messages: [{ role: 'system', content: system }, ...history],
-    }),
-  });
-  if (!resp.ok) throw new Error(`Groq request failed (${resp.status}): ${await resp.text()}`);
-  const data = await resp.json();
-  return (data?.choices?.[0]?.message?.content || '').trim();
+const SEARCH_TOOL = {
+  type: 'function',
+  function: {
+    name: 'search_rds',
+    description:
+      "Search the user's RDS data — feed messages (text), shared files/images (by filename), " +
+      'votes (by question), and people (by name). Scoped to the user\'s groups. Call this ' +
+      'whenever the user asks to find or look up something specific.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Keywords to search for.' } },
+      required: ['query'],
+    },
+  },
+};
+
+async function chatGroq(system: string, history: Msg[], sb: any): Promise<string> {
+  const messages: any[] = [{ role: 'system', content: system }, ...history];
+  for (let i = 0; i < 4; i++) {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${GROQ_API_KEY}` },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        max_tokens: 800,
+        temperature: 0.4,
+        messages,
+        tools: [SEARCH_TOOL],
+        tool_choice: 'auto',
+      }),
+    });
+    if (!resp.ok) throw new Error(`Groq request failed (${resp.status}): ${await resp.text()}`);
+    const data = await resp.json();
+    const msg = data?.choices?.[0]?.message;
+    if (!msg) throw new Error('Groq returned no message.');
+
+    if (msg.tool_calls && msg.tool_calls.length) {
+      messages.push(msg);
+      for (const tc of msg.tool_calls) {
+        let args: any = {};
+        try {
+          args = JSON.parse(tc.function?.arguments || '{}');
+        } catch {
+          args = {};
+        }
+        const result =
+          tc.function?.name === 'search_rds'
+            ? await runSearch(sb, args.query)
+            : 'Unknown tool.';
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      }
+      continue;
+    }
+    return (msg.content || '').trim();
+  }
+  return 'Sorry — I had trouble completing that lookup.';
 }
 
 async function chatGemini(system: string, history: Msg[]): Promise<string> {
@@ -130,18 +256,23 @@ Deno.serve(async (req) => {
       return json({ error: 'No messages provided.' }, 400);
     }
 
-    // Keep only role/content, cap history length.
     const history: Msg[] = messages
       .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && m.content)
       .slice(-20)
       .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
-
     if (history.length === 0) return json({ error: 'No usable messages.' }, 400);
 
     const system = systemPrompt(String(userName || ''), String(context || ''));
 
+    // Supabase client scoped to the caller (their JWT) so search obeys RLS.
+    const authHeader = req.headers.get('Authorization') || '';
+    const sb = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
     const reply = GROQ_API_KEY
-      ? await chatGroq(system, history)
+      ? await chatGroq(system, history, sb)
       : GEMINI_API_KEY
       ? await chatGemini(system, history)
       : await chatClaude(system, history);

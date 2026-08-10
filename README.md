@@ -51,9 +51,11 @@ so the API key never ships in the app bundle: the Feed's **Catch me up**
 ([catch-me-up](supabase/functions/catch-me-up/index.ts)) summary, and the **AI
 assistant** on Home ([assistant](supabase/functions/assistant/index.ts)) — the
 sparkle button in the search bar, a conversational panel that answers using your
-real data (groups, open votes, today's attendance, recent feed) and drafts
-messages. Both are optional; the rest of the app works without them, and both
-read whichever provider secret you set. You need the
+real data (groups, open votes, today's attendance, recent feed), drafts
+messages, and can **search** your feed messages, shared files, votes and people
+(a `search_rds` tool the model calls server-side, RLS-scoped to your groups).
+Both are optional; the rest of the app works without them, and both read
+whichever provider secret you set. You need the
 [Supabase CLI](https://supabase.com/docs/guides/cli).
 
 **Free option — Groq** (free, no billing, no region limits). Get a key at
@@ -111,7 +113,7 @@ via the header bell, and Profile / account settings via the header avatar menu.
 | **Welcome** | `WelcomeScreen` | One-line pitch + "Get Started". |
 | **Sign up / Log in** | `AuthScreen` | **Real Supabase email + password auth**, with validation and error messages. |
 | **Group rail** | `GroupRail` | Always-visible vertical rail of circular group icons, ringed by your role; tap to jump into a group, `+` to create/join. |
-| **Home** | `HomeScreen` | Header (RDS wordmark, bell with unread badge, avatar menu), centered greeting, a **search** across groups + feed messages, and the user's real groups. |
+| **Home** | `HomeScreen` | Header (RDS wordmark, bell with unread badge, avatar menu), centered greeting, a real **search** (groups, feed messages, shared files, votes, people — each tappable), an **AI assistant** button, and the user's real groups. |
 | **Alerts** | `AlertsScreen` | Real in-app notifications (Supabase); reached from the Home bell; unread dot + badge; tap marks read and jumps to the vote/feed/attendance/reports. |
 | **New group** | `NewGroupScreen` | Create (name + template) or Join (**scan a QR** / enter a code); both add to the live groups and open the group. |
 | **Scan group** | `ScanGroupScreen` | Camera QR scanner (`expo-camera`) — scan a group's QR to join. |

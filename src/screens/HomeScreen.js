@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,10 @@ import { colors, spacing, radius, type } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 import { useNotifications } from '../state/notifications';
-import { supabase } from '../lib/supabase';
+import { searchAll } from '../lib/search';
 import { confirm } from '../lib/confirm';
+
+const EMPTY_RESULTS = { groups: [], messages: [], files: [], votes: [], people: [] };
 
 const HEADER_AVATAR_COLOR = '#3F4048';
 
@@ -67,44 +69,26 @@ export default function HomeScreen({ navigation }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [messageHits, setMessageHits] = useState([]);
+  const [results, setResults] = useState(EMPTY_RESULTS);
   const q = query.trim();
 
-  const groupsById = useMemo(() => {
-    const map = {};
-    groups.forEach((g) => (map[g.id] = g));
-    return map;
-  }, [groups]);
-
-  const groupHits = useMemo(() => {
-    if (!q) return [];
-    const needle = q.toLowerCase();
-    return groups.filter((g) => g.name.toLowerCase().includes(needle));
-  }, [q, groups]);
-
-  // Search feed content across the user's groups. RLS already scopes `posts`
-  // to groups the user belongs to, so a plain query is safe.
+  // Real cross-entity search (messages, files, votes, people, groups),
+  // scoped by RLS to the user's groups. Debounced.
   useEffect(() => {
     if (!q) {
-      setMessageHits([]);
+      setResults(EMPTY_RESULTS);
       return;
     }
     let cancelled = false;
-    const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
     const t = setTimeout(async () => {
-      const { data } = await supabase
-        .from('posts')
-        .select('id, group_id, text, author_name, type, created_at')
-        .ilike('text', pattern)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (!cancelled) setMessageHits(data || []);
+      const r = await searchAll(q, { groups, user });
+      if (!cancelled) setResults(r);
     }, 250);
     return () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [q]);
+  }, [q, groups, user]);
 
   function confirmSignOut() {
     confirm({
@@ -194,20 +178,7 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {searching ? (
-          <SearchResults
-            query={q}
-            groupHits={groupHits}
-            messageHits={messageHits}
-            groupsById={groupsById}
-            onOpenGroup={(g) => navigation.navigate('Feed', { groupId: g.id, groupName: g.name })}
-            onOpenMessage={(m) => {
-              const g = groupsById[m.group_id];
-              navigation.navigate('Feed', {
-                groupId: m.group_id,
-                groupName: g ? g.name : 'Group',
-              });
-            }}
-          />
+          <SearchResults query={q} results={results} navigation={navigation} />
         ) : (
           <>
             <SectionLabel style={styles.section}>Your groups</SectionLabel>
@@ -245,9 +216,29 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-function SearchResults({ query, groupHits, messageHits, groupsById, onOpenGroup, onOpenMessage }) {
-  const nothing = groupHits.length === 0 && messageHits.length === 0;
-  if (nothing) {
+function ResultRow({ icon, title, meta, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.msgRow, pressed && styles.pressed]}
+    >
+      <View style={styles.msgIcon}>
+        <Ionicons name={icon} size={18} color={colors.inkSoft} />
+      </View>
+      <View style={styles.msgBody}>
+        <Text style={styles.msgText} numberOfLines={2}>{title}</Text>
+        {meta ? <Text style={styles.msgMeta} numberOfLines={1}>{meta}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function SearchResults({ query, results, navigation }) {
+  const { groups, messages, files, votes, people } = results;
+  const total =
+    groups.length + messages.length + files.length + votes.length + people.length;
+
+  if (total === 0) {
     return (
       <View style={styles.empty}>
         <Ionicons name="search-outline" size={28} color={colors.muted} />
@@ -256,41 +247,76 @@ function SearchResults({ query, groupHits, messageHits, groupsById, onOpenGroup,
     );
   }
 
+  const toFeed = (groupId, groupName) => navigation.navigate('Feed', { groupId, groupName });
+
   return (
     <>
-      {groupHits.length ? (
+      {groups.length ? (
         <>
           <SectionLabel style={styles.section}>Groups</SectionLabel>
-          {groupHits.map((g) => (
-            <GroupCard key={g.id} group={g} onPress={() => onOpenGroup(g)} />
+          {groups.map((g) => (
+            <GroupCard key={g.id} group={g} onPress={() => toFeed(g.id, g.name)} />
           ))}
         </>
       ) : null}
 
-      {messageHits.length ? (
+      {messages.length ? (
         <>
           <SectionLabel style={styles.section}>Messages</SectionLabel>
-          {messageHits.map((m) => {
-            const g = groupsById[m.group_id];
-            return (
-              <Pressable
-                key={m.id}
-                onPress={() => onOpenMessage(m)}
-                style={({ pressed }) => [styles.msgRow, pressed && styles.pressed]}
-              >
-                <View style={styles.msgIcon}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.inkSoft} />
-                </View>
-                <View style={styles.msgBody}>
-                  <Text style={styles.msgText} numberOfLines={2}>{m.text}</Text>
-                  <Text style={styles.msgMeta} numberOfLines={1}>
-                    {(g ? g.name : 'Group')}
-                    {m.author_name ? ` · ${m.author_name}` : ''} · {relTime(m.created_at)}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
+          {messages.map((m) => (
+            <ResultRow
+              key={m.id}
+              icon="chatbubble-ellipses-outline"
+              title={m.text}
+              meta={`${m.groupName}${m.author_name ? ` · ${m.author_name}` : ''} · ${relTime(m.created_at)}`}
+              onPress={() => toFeed(m.group_id, m.groupName)}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {files.length ? (
+        <>
+          <SectionLabel style={styles.section}>Files & media</SectionLabel>
+          {files.map((f) => (
+            <ResultRow
+              key={f.id}
+              icon={f.attachment_type === 'image' ? 'image-outline' : 'document-outline'}
+              title={f.attachment_name || 'Attachment'}
+              meta={`${f.groupName}${f.author_name ? ` · ${f.author_name}` : ''} · ${relTime(f.created_at)}`}
+              onPress={() => toFeed(f.group_id, f.groupName)}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {votes.length ? (
+        <>
+          <SectionLabel style={styles.section}>Votes</SectionLabel>
+          {votes.map((v) => (
+            <ResultRow
+              key={v.id}
+              icon="bar-chart-outline"
+              title={v.question}
+              meta={`${v.groupName} · ${v.status === 'open' ? 'Open' : 'Closed'}`}
+              onPress={() => navigation.navigate('VoteDetail', { voteId: v.id, groupName: v.groupName })}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {people.length ? (
+        <>
+          <SectionLabel style={styles.section}>People</SectionLabel>
+          {people.map((p) => (
+            <ResultRow
+              key={p.key}
+              icon="person-outline"
+              title={p.you ? `${p.name} (you)` : p.name}
+              meta={p.groupName}
+              onPress={() => navigation.navigate('Members', { groupId: p.groupId, groupName: p.groupName })}
+            />
+          ))}
         </>
       ) : null}
     </>
