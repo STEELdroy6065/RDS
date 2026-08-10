@@ -30,6 +30,10 @@ import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
 import { confirm, notify } from '../../lib/confirm';
 
+// Only offer an AI catch-up once a real backlog has built up, to keep API
+// calls (and cost) minimal.
+const CATCHUP_THRESHOLD = 10;
+
 function relTime(iso) {
   if (!iso) return '';
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -70,6 +74,12 @@ export default function FeedScreen({ route, navigation }) {
   const [query, setQuery] = useState('');
   const [muted, setMuted] = useState(false);
 
+  // Catch me up (AI summary of unread messages)
+  const [sinceTime, setSinceTime] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [catchUpDismissed, setCatchUpDismissed] = useState(false);
+
   // Long-press action menu + report modal
   const [menuPost, setMenuPost] = useState(null);
   const [reportPost, setReportPost] = useState(null);
@@ -81,6 +91,21 @@ export default function FeedScreen({ route, navigation }) {
   useEffect(() => {
     AsyncStorage.getItem(muteKey).then((v) => setMuted(v === '1'));
   }, [muteKey]);
+
+  // Snapshot when this group was last opened, then mark it seen now — so we can
+  // tell how much arrived while the user was away (drives "Catch me up").
+  useEffect(() => {
+    let active = true;
+    const key = `lastSeen:${groupId}`;
+    AsyncStorage.getItem(key).then((v) => {
+      if (!active) return;
+      setSinceTime(v || new Date().toISOString());
+      AsyncStorage.setItem(key, new Date().toISOString());
+    });
+    return () => {
+      active = false;
+    };
+  }, [groupId]);
 
   function toggleMute() {
     const next = !muted;
@@ -95,12 +120,52 @@ export default function FeedScreen({ route, navigation }) {
     });
   }
 
+  // Ask the AI Edge Function to summarize the unread backlog.
+  async function catchMeUp() {
+    setSummarizing(true);
+    try {
+      const chron = [...unread].reverse(); // oldest -> newest for the transcript
+      const capped = chron.length > 150 ? chron.slice(-150) : chron;
+      const payload = capped.map((m) => ({
+        author_name: m.author_name,
+        type: m.type,
+        text: m.text,
+        attachment_type: m.attachment_type,
+        attachment_name: m.attachment_name,
+      }));
+      const { data, error } = await supabase.functions.invoke('catch-me-up', {
+        body: { messages: payload, groupName },
+      });
+      if (error) throw error;
+      if (data && data.error) throw new Error(data.error);
+      setSummary((data && data.summary) || 'No summary available.');
+    } catch (e) {
+      notify({
+        title: 'Catch me up unavailable',
+        message:
+          (e && e.message) ||
+          'Could not generate a summary. Make sure the catch-me-up function is deployed.',
+      });
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
   // Filter the feed when searching (skips deleted placeholders).
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return messages;
     return messages.filter((m) => !m.deleted && (m.text || '').toLowerCase().includes(q));
   }, [messages, query]);
+
+  // Messages that arrived from others since the user last opened this group.
+  const unread = useMemo(() => {
+    if (!sinceTime) return [];
+    const since = new Date(sinceTime).getTime();
+    return messages.filter(
+      (m) => !m.deleted && m.author_id !== user.id && new Date(m.created_at).getTime() > since
+    );
+  }, [messages, sinceTime, user.id]);
 
   const canDelete = (post) => post.author_id === user.id || isModerator;
 
@@ -343,6 +408,48 @@ export default function FeedScreen({ route, navigation }) {
             hitSlop={8}
           >
             <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Catch me up — AI summary of what was missed (dismissible, non-blocking) */}
+      {summarizing ? (
+        <View style={styles.catchCard}>
+          <ActivityIndicator size="small" color={colors.inkSoft} />
+          <Text style={styles.catchSummary}>Catching you up…</Text>
+        </View>
+      ) : summary ? (
+        <View style={styles.catchCard}>
+          <Ionicons name="sparkles" size={16} color={colors.inkSoft} style={styles.catchIcon} />
+          <View style={styles.catchBody}>
+            <Text style={styles.catchTitle}>Catch me up</Text>
+            <Text style={styles.catchSummary}>{summary}</Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              setSummary(null);
+              setCatchUpDismissed(true);
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={18} color={colors.muted} />
+          </Pressable>
+        </View>
+      ) : unread.length > CATCHUP_THRESHOLD && !catchUpDismissed ? (
+        <View style={styles.catchButtonRow}>
+          <Pressable
+            onPress={catchMeUp}
+            style={({ pressed }) => [styles.catchButton, pressed && styles.pressed]}
+          >
+            <Ionicons name="sparkles-outline" size={16} color={colors.onPrimary} />
+            <Text style={styles.catchButtonText}>Catch me up · {unread.length} new</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setCatchUpDismissed(true)}
+            hitSlop={8}
+            style={styles.catchDismiss}
+          >
+            <Ionicons name="close" size={16} color={colors.muted} />
           </Pressable>
         </View>
       ) : null}
@@ -801,6 +908,44 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   searchInput: { ...type.body, flex: 1, color: colors.ink, padding: 0 },
+
+  // catch me up
+  catchButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  catchButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+  },
+  catchButtonText: { ...type.bodyStrong, fontSize: 13, color: colors.onPrimary },
+  catchDismiss: { padding: 4 },
+  catchCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  catchIcon: { marginTop: 2 },
+  catchBody: { flex: 1 },
+  catchTitle: { ...type.label, color: colors.muted, marginBottom: 4 },
+  catchSummary: { ...type.body, color: colors.ink, lineHeight: 20, flex: 1 },
 
   // 3-dot header menu
   hMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.15)' },
