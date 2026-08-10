@@ -52,20 +52,22 @@ The Feed's **Catch me up** button summarizes unread messages via an
 the rest of the app works without it, and it picks its provider from whichever
 secret you set. You need the [Supabase CLI](https://supabase.com/docs/guides/cli).
 
-**Free option — Google Gemini** (free tier, no billing needed). Get a key at
-[aistudio.google.com/apikey](https://aistudio.google.com/apikey), then:
+**Free option — Groq** (free, no billing, no region limits). Get a key at
+[console.groq.com/keys](https://console.groq.com/keys), then:
 
 ```bash
 export SUPABASE_ACCESS_TOKEN=sbp_...   # from supabase.com/dashboard/account/tokens
-npx supabase secrets set GEMINI_API_KEY=... --project-ref <your-project-ref>
+npx supabase secrets set GROQ_API_KEY=gsk_... --project-ref <your-project-ref>
 npx supabase functions deploy catch-me-up --project-ref <your-project-ref>
 ```
 
-**Or Anthropic Claude** (paid): set `ANTHROPIC_API_KEY=sk-ant-...` instead of
-`GEMINI_API_KEY`. If both are set, Gemini is used. Model overrides:
-`GEMINI_MODEL` (default `gemini-2.0-flash`) / `ANTHROPIC_MODEL` (default
-`claude-3-5-haiku-latest`). Until the function is deployed, the button just
-shows a friendly "unavailable" message.
+**Other providers** — set one of these secrets instead:
+`GEMINI_API_KEY` (Google Gemini, free tier where available) or `ANTHROPIC_API_KEY`
+(Claude, paid). If several are set the priority is Groq → Gemini → Claude. Model
+overrides: `GROQ_MODEL` (default `llama-3.3-70b-versatile`), `GEMINI_MODEL`
+(default `gemini-2.0-flash`), `ANTHROPIC_MODEL` (default
+`claude-3-5-haiku-latest`). Until the function is deployed, the button just shows
+a friendly "unavailable" message.
 
 > **Password reset:** for the "Forgot password" deep link to return into the app,
 > add the app's redirect URL to Supabase → **Authentication → URL Configuration →

@@ -4,13 +4,17 @@
 // The AI key lives here as a Supabase secret, never in the app bundle, so it
 // can't be extracted from the public web build.
 //
-// Provider is chosen automatically:
-//   - if GEMINI_API_KEY is set    -> Google Gemini (has a free tier)
-//   - else if ANTHROPIC_API_KEY   -> Anthropic Claude
+// Provider is chosen automatically (first key present wins):
+//   - GROQ_API_KEY       -> Groq (free, no billing) — llama-3.3-70b-versatile
+//   - GEMINI_API_KEY     -> Google Gemini (free tier where available)
+//   - ANTHROPIC_API_KEY  -> Anthropic Claude (paid)
 //
 // Deploy:  supabase functions deploy catch-me-up
-// Secret (free option):
-//   supabase secrets set GEMINI_API_KEY=...        # from aistudio.google.com/apikey
+// Secret (free option, Groq):
+//   supabase secrets set GROQ_API_KEY=gsk_...       # from console.groq.com/keys
+//   (optional) supabase secrets set GROQ_MODEL=llama-3.3-70b-versatile
+// Secret (free option, Gemini):
+//   supabase secrets set GEMINI_API_KEY=...         # from aistudio.google.com/apikey
 //   (optional) supabase secrets set GEMINI_MODEL=gemini-2.0-flash
 // Secret (Claude option):
 //   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
@@ -18,6 +22,8 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const GROQ_MODEL = Deno.env.get('GROQ_MODEL') ?? 'llama-3.3-70b-versatile';
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -49,6 +55,25 @@ function lineFor(m: any): string {
 }
 
 // --- Providers -------------------------------------------------------------
+
+async function summarizeWithGroq(prompt: string): Promise<string> {
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      max_tokens: 400,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!resp.ok) throw new Error(`Groq request failed (${resp.status}): ${await resp.text()}`);
+  const data = await resp.json();
+  return (data?.choices?.[0]?.message?.content || '').trim();
+}
 
 async function summarizeWithGemini(prompt: string): Promise<string> {
   const resp = await fetch(
@@ -93,8 +118,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    if (!GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
-      return json({ error: 'No AI key configured. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.' }, 500);
+    if (!GROQ_API_KEY && !GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
+      return json({ error: 'No AI key configured. Set GROQ_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY.' }, 500);
     }
 
     const { messages, groupName } = await req.json().catch(() => ({}));
@@ -113,7 +138,9 @@ Deno.serve(async (req) => {
       `- Do not restate every message or quote verbatim; do not use bullet points or headers.\n\n` +
       `Unread messages (oldest first):\n${transcript}`;
 
-    const summary = GEMINI_API_KEY
+    const summary = GROQ_API_KEY
+      ? await summarizeWithGroq(prompt)
+      : GEMINI_API_KEY
       ? await summarizeWithGemini(prompt)
       : await summarizeWithClaude(prompt);
 
