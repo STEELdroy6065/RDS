@@ -120,11 +120,17 @@ export default function FeedScreen({ route, navigation }) {
     });
   }
 
-  // Ask the AI Edge Function to summarize the unread backlog.
-  async function catchMeUp() {
+  // Send a set of messages (newest-first) to the AI Edge Function and show the
+  // summary card. Shared by the automatic "Catch me up" and the manual menu.
+  async function runSummary(descMessages) {
+    const usable = (descMessages || []).filter((m) => !m.deleted);
+    if (usable.length === 0) {
+      notify({ title: 'Nothing to summarize', message: 'There are no messages here yet.' });
+      return;
+    }
     setSummarizing(true);
     try {
-      const chron = [...unread].reverse(); // oldest -> newest for the transcript
+      const chron = [...usable].reverse(); // oldest -> newest for the transcript
       const capped = chron.length > 150 ? chron.slice(-150) : chron;
       const payload = capped.map((m) => ({
         author_name: m.author_name,
@@ -141,7 +147,7 @@ export default function FeedScreen({ route, navigation }) {
       setSummary((data && data.summary) || 'No summary available.');
     } catch (e) {
       notify({
-        title: 'Catch me up unavailable',
+        title: 'Summary unavailable',
         message:
           (e && e.message) ||
           'Could not generate a summary. Make sure the catch-me-up function is deployed.',
@@ -149,6 +155,17 @@ export default function FeedScreen({ route, navigation }) {
     } finally {
       setSummarizing(false);
     }
+  }
+
+  // Automatic: summarize just the unread backlog.
+  function catchMeUp() {
+    runSummary(unread);
+  }
+
+  // Manual (from the ⋮ menu): summarize the recent chat on demand, any time.
+  function summarizeChat() {
+    setMenuOpen(false);
+    runSummary(messages.slice(0, 60));
   }
 
   // Filter the feed when searching (skips deleted placeholders).
@@ -645,6 +662,11 @@ export default function FeedScreen({ route, navigation }) {
                 setMenuOpen(false);
                 setSearchOpen(true);
               }}
+            />
+            <HeaderMenuRow
+              icon="sparkles-outline"
+              label="Summarize chat"
+              onPress={summarizeChat}
             />
             <HeaderMenuRow
               icon={muted ? 'notifications-off-outline' : 'notifications-outline'}
