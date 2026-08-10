@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TextInput,
   Pressable,
   Modal,
@@ -60,7 +61,8 @@ export default function FeedScreen({ route, navigation }) {
   const [announce, setAnnounce] = useState(false);
   const [sending, setSending] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  // Attachments picked but not yet sent (staged with an optional caption).
+  const [pending, setPending] = useState([]);
 
   // Chat header controls
   const [menuOpen, setMenuOpen] = useState(false);
@@ -147,71 +149,85 @@ export default function FeedScreen({ route, navigation }) {
     }, [load])
   );
 
-  async function send() {
-    const body = text.trim();
-    if (!body || sending) return;
-    setSending(true);
-    const { error } = await supabase.from('posts').insert({
-      group_id: groupId,
-      author_id: user.id,
-      author_name: user.name,
-      type: announce ? 'Announcement' : 'Discussion',
-      text: body,
-    });
-    setSending(false);
-    if (error) {
-      notify({ title: 'Could not send', message: error.message });
-      return;
-    }
-    setText('');
-    setAnnounce(false);
-    load();
+  function stage(items) {
+    if (items.length) setPending((p) => [...p, ...items]);
   }
 
-  // Read a local file into a body the storage client accepts on each platform,
-  // upload it to the public bucket, and post it as a message.
-  async function uploadAndSend({ uri, name, mime, kind }) {
-    setAttachOpen(false);
-    setUploading(true);
+  function removePending(id) {
+    setPending((p) => p.filter((x) => x.id !== id));
+  }
+
+  function mkId(i) {
+    return `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  // Upload one staged file and return its public URL.
+  async function uploadOne({ uri, name, mime, kind }) {
+    const safeName = name || `${kind}-${Date.now()}`;
+    const ext = safeName.includes('.')
+      ? safeName.split('.').pop()
+      : (mime && mime.split('/')[1]) || 'bin';
+    const path = `${groupId}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    let body;
+    if (Platform.OS === 'web') {
+      const res = await fetch(uri);
+      body = await res.blob();
+    } else {
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      body = decode(base64);
+    }
+
+    const { error } = await supabase.storage
+      .from('attachments')
+      .upload(path, body, { contentType: mime || 'application/octet-stream', upsert: false });
+    if (error) throw error;
+    const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
+    return pub.publicUrl;
+  }
+
+  // Send the typed message and/or any staged attachments. Each attachment is
+  // its own post; a typed caption rides along on the first one.
+  async function handleSend() {
+    const body = text.trim();
+    if ((!body && pending.length === 0) || sending) return;
+    setSending(true);
     try {
-      const safeName = name || `${kind}-${Date.now()}`;
-      const ext = safeName.includes('.')
-        ? safeName.split('.').pop()
-        : (mime && mime.split('/')[1]) || 'bin';
-      const path = `${groupId}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-      let body;
-      if (Platform.OS === 'web') {
-        const res = await fetch(uri);
-        body = await res.blob();
+      if (pending.length > 0) {
+        for (let i = 0; i < pending.length; i++) {
+          const att = pending[i];
+          const url = await uploadOne(att);
+          const { error } = await supabase.from('posts').insert({
+            group_id: groupId,
+            author_id: user.id,
+            author_name: user.name,
+            type: 'Resource',
+            text: i === 0 && body ? body : null,
+            attachment_url: url,
+            attachment_type: att.kind === 'image' ? 'image' : 'file',
+            attachment_name: att.name || null,
+            attachment_mime: att.mime || null,
+          });
+          if (error) throw error;
+        }
       } else {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-        body = decode(base64);
+        const { error } = await supabase.from('posts').insert({
+          group_id: groupId,
+          author_id: user.id,
+          author_name: user.name,
+          type: announce ? 'Announcement' : 'Discussion',
+          text: body,
+        });
+        if (error) throw error;
       }
-
-      const { error: upErr } = await supabase.storage
-        .from('attachments')
-        .upload(path, body, { contentType: mime || 'application/octet-stream', upsert: false });
-      if (upErr) throw upErr;
-
-      const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
-      const { error: insErr } = await supabase.from('posts').insert({
-        group_id: groupId,
-        author_id: user.id,
-        author_name: user.name,
-        type: 'Resource',
-        text: null,
-        attachment_url: pub.publicUrl,
-        attachment_type: kind === 'image' ? 'image' : 'file',
-        attachment_name: name || null,
-        attachment_mime: mime || null,
-      });
-      if (insErr) throw insErr;
+      setText('');
+      setAnnounce(false);
+      setPending([]);
       load();
     } catch (e) {
       notify({ title: 'Could not send', message: (e && e.message) || 'Upload failed.' });
     } finally {
-      setUploading(false);
+      setSending(false);
     }
   }
 
@@ -229,38 +245,40 @@ export default function FeedScreen({ route, navigation }) {
       });
       return;
     }
+    // Library allows selecting several at once; the camera takes one shot.
     const result = fromCamera
       ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
-    if (result.canceled) {
-      setAttachOpen(false);
-      return;
-    }
-    const asset = result.assets[0];
-    uploadAndSend({
-      uri: asset.uri,
-      name: asset.fileName || `photo-${Date.now()}.jpg`,
-      mime: asset.mimeType || 'image/jpeg',
-      kind: 'image',
-    });
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsMultipleSelection: true });
+    setAttachOpen(false);
+    if (result.canceled) return;
+    stage(
+      result.assets.map((a, i) => ({
+        id: mkId(i),
+        uri: a.uri,
+        name: a.fileName || `photo-${Date.now()}-${i}.jpg`,
+        mime: a.mimeType || 'image/jpeg',
+        kind: 'image',
+      }))
+    );
   }
 
   async function pickDocument() {
     const result = await DocumentPicker.getDocumentAsync({
       type: '*/*',
+      multiple: true,
       copyToCacheDirectory: true,
     });
-    if (result.canceled) {
-      setAttachOpen(false);
-      return;
-    }
-    const asset = result.assets[0];
-    uploadAndSend({
-      uri: asset.uri,
-      name: asset.name,
-      mime: asset.mimeType || 'application/octet-stream',
-      kind: 'file',
-    });
+    setAttachOpen(false);
+    if (result.canceled) return;
+    stage(
+      result.assets.map((a, i) => ({
+        id: mkId(i),
+        uri: a.uri,
+        name: a.name,
+        mime: a.mimeType || 'application/octet-stream',
+        kind: 'file',
+      }))
+    );
   }
 
   async function submitReport() {
@@ -364,47 +382,89 @@ export default function FeedScreen({ route, navigation }) {
 
         {/* Input bar — hidden when an Admin has disabled member posting. */}
         {canPost ? (
-          <View style={[styles.inputBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.sm }]}>
-            <Pressable
-              onPress={() => setAttachOpen(true)}
-              disabled={uploading}
-              hitSlop={8}
-              style={styles.announceBtn}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color={colors.muted} />
-              ) : (
-                <Ionicons name="add" size={22} color={colors.inkSoft} />
-              )}
-            </Pressable>
-            {isModerator ? (
-              <Pressable
-                onPress={() => setAnnounce((a) => !a)}
-                hitSlop={8}
-                style={[styles.announceBtn, announce && styles.announceOn]}
+          <View style={[styles.composer, { paddingBottom: (insets.bottom || spacing.sm) + spacing.sm }]}>
+            {/* Staged attachments preview (removable, before sending) */}
+            {pending.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={styles.pendingBar}
+                contentContainerStyle={styles.pendingContent}
               >
-                <Ionicons
-                  name="megaphone-outline"
-                  size={18}
-                  color={announce ? colors.onPrimary : colors.muted}
-                />
-              </Pressable>
+                {pending.map((att) => (
+                  <View key={att.id} style={styles.pendingItem}>
+                    {att.kind === 'image' ? (
+                      <Image source={{ uri: att.uri }} style={styles.pendingThumb} />
+                    ) : (
+                      <View style={styles.pendingFile}>
+                        <Ionicons name="document-text-outline" size={20} color={colors.inkSoft} />
+                        <Text style={styles.pendingName} numberOfLines={2}>{att.name}</Text>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => removePending(att.id)}
+                      hitSlop={6}
+                      style={styles.pendingRemove}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.ink} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
             ) : null}
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder={announce ? 'Write an announcement…' : 'Message'}
-              placeholderTextColor={colors.muted}
-              style={[styles.input, announce && styles.inputAnnounce]}
-              multiline
-            />
-            <Pressable
-              onPress={send}
-              disabled={!text.trim() || sending}
-              style={[styles.sendBtn, (!text.trim() || sending) && styles.sendDisabled]}
-            >
-              <Ionicons name="arrow-up" size={20} color={colors.onPrimary} />
-            </Pressable>
+
+            <View style={styles.inputRow}>
+              <Pressable
+                onPress={() => setAttachOpen(true)}
+                disabled={sending}
+                hitSlop={8}
+                style={styles.announceBtn}
+              >
+                <Ionicons name="add" size={22} color={colors.inkSoft} />
+              </Pressable>
+              {isModerator && pending.length === 0 ? (
+                <Pressable
+                  onPress={() => setAnnounce((a) => !a)}
+                  hitSlop={8}
+                  style={[styles.announceBtn, announce && styles.announceOn]}
+                >
+                  <Ionicons
+                    name="megaphone-outline"
+                    size={18}
+                    color={announce ? colors.onPrimary : colors.muted}
+                  />
+                </Pressable>
+              ) : null}
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                placeholder={
+                  pending.length > 0
+                    ? 'Add a caption…'
+                    : announce
+                    ? 'Write an announcement…'
+                    : 'Message'
+                }
+                placeholderTextColor={colors.muted}
+                style={[styles.input, announce && pending.length === 0 && styles.inputAnnounce]}
+                multiline
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={(!text.trim() && pending.length === 0) || sending}
+                style={[
+                  styles.sendBtn,
+                  ((!text.trim() && pending.length === 0) || sending) && styles.sendDisabled,
+                ]}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Ionicons name="arrow-up" size={20} color={colors.onPrimary} />
+                )}
+              </Pressable>
+            </View>
           </View>
         ) : (
           <View style={[styles.lockedBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.md }]}>
@@ -879,15 +939,48 @@ const styles = StyleSheet.create({
   announceAuthor: { ...type.caption, color: colors.muted, marginTop: spacing.sm },
 
   // input bar
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  composer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
     backgroundColor: colors.bg,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: spacing.sm,
+  },
+
+  // staged attachment previews
+  pendingBar: { maxHeight: 92, marginBottom: spacing.sm },
+  pendingContent: { gap: spacing.sm, paddingRight: spacing.sm, alignItems: 'center' },
+  pendingItem: { width: 72, height: 72 },
+  pendingThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+  },
+  pendingFile: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  pendingName: { ...type.caption, fontSize: 9, color: colors.inkSoft, textAlign: 'center' },
+  pendingRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
   },
   announceBtn: {
     width: 40,
