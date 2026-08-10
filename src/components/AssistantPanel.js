@@ -67,7 +67,7 @@ async function buildContext(groups) {
     safe(
       supabase
         .from('posts')
-        .select('group_id, author_name, type, text, attachment_type, created_at, deleted')
+        .select('group_id, author_name, type, text, attachment_type, attachment_name, created_at, deleted')
         .in('group_id', groupIds)
         .order('created_at', { ascending: false })
         .limit(40)
@@ -116,9 +116,14 @@ async function buildContext(groups) {
   if (livePosts.length === 0) lines.push('- none');
   else
     livePosts.slice(0, 25).forEach((p) => {
-      const body =
-        (p.text || '').trim() ||
-        (p.attachment_type === 'image' ? '[image]' : p.attachment_type ? '[file]' : '');
+      const text = (p.text || '').trim();
+      const attach =
+        p.attachment_type === 'image'
+          ? `[image${p.attachment_name ? `: ${p.attachment_name}` : ''}]`
+          : p.attachment_type
+          ? `[file${p.attachment_name ? `: ${p.attachment_name}` : ''}]`
+          : '';
+      const body = [text, attach].filter(Boolean).join(' ');
       lines.push(
         `- ${nameById[p.group_id] || 'Group'} · ${p.author_name || 'Member'}${
           p.type === 'Announcement' ? ' (ANNOUNCEMENT)' : ''
@@ -140,12 +145,21 @@ export default function AssistantPanel({ visible, onClose }) {
   const [ctx, setCtx] = useState(null); // { text, mostActive }
   const scrollRef = useRef(null);
 
-  // Build fresh context each time the panel opens; reset the conversation.
+  // Reset the conversation only when the panel opens — NOT when `groups`
+  // happens to refresh mid-chat (that would wipe the history we need to send
+  // for follow-ups to make sense).
+  useEffect(() => {
+    if (visible) {
+      setConversation([]);
+      setInput('');
+      setCtx(null);
+    }
+  }, [visible]);
+
+  // Build (and refresh) the data context while open, without touching the
+  // conversation.
   useEffect(() => {
     if (!visible) return;
-    setConversation([]);
-    setInput('');
-    setCtx(null);
     let active = true;
     buildContext(groups).then((c) => {
       if (active) setCtx(c);
@@ -176,22 +190,37 @@ export default function AssistantPanel({ visible, onClose }) {
         context = await buildContext(groups);
         setCtx(context);
       }
+      // Send the real conversation for follow-up context, minus any error
+      // placeholders (those aren't genuine assistant turns).
+      const history = next
+        .filter((m) => !m.error)
+        .map((m) => ({ role: m.role, content: m.content }));
       const { data, error } = await supabase.functions.invoke('assistant', {
-        body: { messages: next, context: context.text, userName: user && user.name },
+        body: { messages: history, context: context.text, userName: user && user.name },
       });
-      if (error) throw error;
+      if (error) {
+        // supabase-js hides the function's real error behind a generic
+        // "non-2xx" message — the body is on error.context (a Response).
+        let detail = (error && error.message) || 'request failed';
+        try {
+          if (error && error.context && typeof error.context.json === 'function') {
+            const body = await error.context.json();
+            if (body && body.error) detail = body.error;
+          }
+        } catch {
+          /* keep the generic detail */
+        }
+        throw new Error(detail);
+      }
       if (data && data.error) throw new Error(data.error);
-      setConversation((c) => [...c, { role: 'assistant', content: (data && data.reply) || '…' }]);
+      const reply = data && data.reply;
+      if (!reply) throw new Error('The assistant returned an empty reply.');
+      setConversation((c) => [...c, { role: 'assistant', content: reply }]);
     } catch (e) {
+      const msg = (e && e.message) || 'Something went wrong.';
       setConversation((c) => [
         ...c,
-        {
-          role: 'assistant',
-          content:
-            "Sorry — I couldn't reach the assistant. " +
-            ((e && e.message) || '') +
-            '\n\n(If this keeps happening, the "assistant" function may not be deployed yet.)',
-        },
+        { role: 'assistant', content: `⚠️ ${msg}`, error: true },
       ]);
     } finally {
       setLoading(false);

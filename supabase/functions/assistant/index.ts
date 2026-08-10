@@ -191,17 +191,28 @@ async function chatGroq(system: string, history: Msg[], sb: any): Promise<string
         } catch {
           args = {};
         }
-        const result =
-          tc.function?.name === 'search_rds'
-            ? await runSearch(sb, args.query)
-            : 'Unknown tool.';
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+        let result: string;
+        try {
+          result =
+            tc.function?.name === 'search_rds'
+              ? await runSearch(sb, args.query)
+              : `Unknown tool: ${tc.function?.name}`;
+        } catch (err) {
+          // A search failure must not kill the whole reply — tell the model.
+          result = `The search could not be completed: ${(err as Error)?.message || 'error'}`;
+        }
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: tc.function?.name,
+          content: String(result),
+        });
       }
       continue;
     }
     return (msg.content || '').trim();
   }
-  return 'Sorry — I had trouble completing that lookup.';
+  return 'I looked but could not settle on an answer — could you rephrase that?';
 }
 
 async function chatGemini(system: string, history: Msg[]): Promise<string> {
