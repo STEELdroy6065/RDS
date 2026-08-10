@@ -47,21 +47,25 @@ Each is idempotent (safe to re-run).
 #### Optional: the "Catch me up" AI summary
 
 The Feed's **Catch me up** button summarizes unread messages via an
-[Edge Function](supabase/functions/catch-me-up/index.ts) that calls Claude
+[Edge Function](supabase/functions/catch-me-up/index.ts) that calls an AI
 **server-side** — so the API key never ships in the app bundle. It's optional;
-the rest of the app works without it. To enable it you need the
-[Supabase CLI](https://supabase.com/docs/guides/cli):
+the rest of the app works without it, and it picks its provider from whichever
+secret you set. You need the [Supabase CLI](https://supabase.com/docs/guides/cli).
+
+**Free option — Google Gemini** (free tier, no billing needed). Get a key at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey), then:
 
 ```bash
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # your Anthropic API key
-supabase functions deploy catch-me-up
+export SUPABASE_ACCESS_TOKEN=sbp_...   # from supabase.com/dashboard/account/tokens
+npx supabase secrets set GEMINI_API_KEY=... --project-ref <your-project-ref>
+npx supabase functions deploy catch-me-up --project-ref <your-project-ref>
 ```
 
-Optionally `supabase secrets set ANTHROPIC_MODEL=claude-3-5-haiku-latest` to pick
-the model (that fast, low-cost model is the default). Until it's deployed, the
-button just shows a friendly "unavailable" message.
+**Or Anthropic Claude** (paid): set `ANTHROPIC_API_KEY=sk-ant-...` instead of
+`GEMINI_API_KEY`. If both are set, Gemini is used. Model overrides:
+`GEMINI_MODEL` (default `gemini-2.0-flash`) / `ANTHROPIC_MODEL` (default
+`claude-3-5-haiku-latest`). Until the function is deployed, the button just
+shows a friendly "unavailable" message.
 
 > **Password reset:** for the "Forgot password" deep link to return into the app,
 > add the app's redirect URL to Supabase → **Authentication → URL Configuration →

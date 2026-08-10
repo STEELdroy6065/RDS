@@ -1,15 +1,25 @@
 // RDS — "Catch me up" AI summary Edge Function.
 //
-// Summarizes a batch of unread group-chat messages into 3-5 sentences using
-// Anthropic's Claude API. The API key lives here as a Supabase secret, never in
-// the app bundle, so it can't be extracted from the public web build.
+// Summarizes a batch of unread group-chat messages into 3-5 sentences.
+// The AI key lives here as a Supabase secret, never in the app bundle, so it
+// can't be extracted from the public web build.
+//
+// Provider is chosen automatically:
+//   - if GEMINI_API_KEY is set    -> Google Gemini (has a free tier)
+//   - else if ANTHROPIC_API_KEY   -> Anthropic Claude
 //
 // Deploy:  supabase functions deploy catch-me-up
-// Secret:  supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-//          (optional) supabase secrets set ANTHROPIC_MODEL=claude-3-5-haiku-latest
+// Secret (free option):
+//   supabase secrets set GEMINI_API_KEY=...        # from aistudio.google.com/apikey
+//   (optional) supabase secrets set GEMINI_MODEL=gemini-2.0-flash
+// Secret (Claude option):
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+//   (optional) supabase secrets set ANTHROPIC_MODEL=claude-3-5-haiku-latest
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-3-5-haiku-latest';
 
@@ -38,11 +48,54 @@ function lineFor(m: any): string {
   return `${who}${tag}: ${body}`;
 }
 
+// --- Providers -------------------------------------------------------------
+
+async function summarizeWithGemini(prompt: string): Promise<string> {
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY! },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 400, temperature: 0.3 },
+      }),
+    }
+  );
+  if (!resp.ok) throw new Error(`Gemini request failed (${resp.status}): ${await resp.text()}`);
+  const data = await resp.json();
+  const parts = data?.candidates?.[0]?.content?.parts ?? [];
+  return parts.map((p: any) => p?.text || '').join('').trim();
+}
+
+async function summarizeWithClaude(prompt: string): Promise<string> {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!resp.ok) throw new Error(`Claude request failed (${resp.status}): ${await resp.text()}`);
+  const data = await resp.json();
+  return (data?.content?.[0]?.text || '').trim();
+}
+
+// --- Handler ---------------------------------------------------------------
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    if (!ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY is not configured.' }, 500);
+    if (!GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
+      return json({ error: 'No AI key configured. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.' }, 500);
+    }
 
     const { messages, groupName } = await req.json().catch(() => ({}));
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -60,27 +113,10 @@ Deno.serve(async (req) => {
       `- Do not restate every message or quote verbatim; do not use bullet points or headers.\n\n` +
       `Unread messages (oldest first):\n${transcript}`;
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 400,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    const summary = GEMINI_API_KEY
+      ? await summarizeWithGemini(prompt)
+      : await summarizeWithClaude(prompt);
 
-    if (!resp.ok) {
-      const detail = await resp.text();
-      return json({ error: `AI request failed (${resp.status}).`, detail }, 502);
-    }
-
-    const data = await resp.json();
-    const summary = (data?.content?.[0]?.text || '').trim();
     if (!summary) return json({ error: 'The AI returned an empty summary.' }, 502);
     return json({ summary });
   } catch (e) {
