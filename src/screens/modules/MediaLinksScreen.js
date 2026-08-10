@@ -31,24 +31,36 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-// Extract every URL shared in the feed, newest first, split into images
-// (Media) and everything else (Links).
+// Build the Media (images) and Links lists from the feed, newest first.
+// Media = uploaded image attachments + image URLs pasted in text.
+// Links = every other URL shared in text.
 function extract(posts) {
   const media = [];
   const links = [];
   posts.forEach((p) => {
-    const found = (p.text || '').match(URL_RE);
-    if (!found) return;
-    found.forEach((url, idx) => {
-      const entry = {
-        key: `${p.id}-${idx}`,
-        url: url.replace(/[).,]+$/, ''), // trim trailing punctuation
+    // Uploaded image attachments.
+    if (p.attachment_type === 'image' && p.attachment_url) {
+      media.push({
+        key: `${p.id}-att`,
+        url: p.attachment_url,
         author: p.author_name || 'Group member',
         created_at: p.created_at,
-      };
-      if (IMAGE_RE.test(entry.url)) media.push(entry);
-      else links.push(entry);
-    });
+      });
+    }
+    // URLs shared in the message body.
+    const found = (p.text || '').match(URL_RE);
+    if (found) {
+      found.forEach((url, idx) => {
+        const entry = {
+          key: `${p.id}-${idx}`,
+          url: url.replace(/[).,]+$/, ''), // trim trailing punctuation
+          author: p.author_name || 'Group member',
+          created_at: p.created_at,
+        };
+        if (IMAGE_RE.test(entry.url)) media.push(entry);
+        else links.push(entry);
+      });
+    }
   });
   return { media, links };
 }
@@ -63,12 +75,24 @@ export default function MediaLinksScreen({ route, navigation }) {
   const [tab, setTab] = useState('media');
 
   const load = useCallback(async () => {
-    const { data } = await supabase
+    // Full select first; fall back if the attachments migration isn't in yet.
+    const FULL = 'id, text, author_name, created_at, attachment_url, attachment_type';
+    const BASE = 'id, text, author_name, created_at';
+    let { data, error } = await supabase
       .from('posts')
-      .select('id, text, author_name, created_at')
+      .select(FULL)
       .eq('group_id', groupId)
       .eq('deleted', false)
       .order('created_at', { ascending: false });
+    if (error) {
+      const retry = await supabase
+        .from('posts')
+        .select(BASE)
+        .eq('group_id', groupId)
+        .eq('deleted', false)
+        .order('created_at', { ascending: false });
+      data = retry.data;
+    }
     setPosts(data || []);
   }, [groupId]);
 

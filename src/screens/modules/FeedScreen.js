@@ -6,6 +6,9 @@ import {
   TextInput,
   Pressable,
   Modal,
+  Image,
+  ActivityIndicator,
+  Linking,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -14,6 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import Screen from '../../components/Screen';
 import Avatar from '../../components/Avatar';
 import { colors, spacing, radius, type, roleTheme } from '../../theme';
@@ -52,6 +59,8 @@ export default function FeedScreen({ route, navigation }) {
   const [text, setText] = useState('');
   const [announce, setAnnounce] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Chat header controls
   const [menuOpen, setMenuOpen] = useState(false);
@@ -109,11 +118,26 @@ export default function FeedScreen({ route, navigation }) {
   }
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
+    // Full column set first; if the attachments migration hasn't been run those
+    // columns won't exist, so fall back to the base set (attachments just won't
+    // render) rather than breaking the feed.
+    const FULL =
+      'id, author_id, author_name, type, text, deleted, created_at, attachment_url, attachment_type, attachment_name, attachment_mime';
+    const BASE = 'id, author_id, author_name, type, text, deleted, created_at';
+    let { data, error } = await supabase
       .from('posts')
-      .select('id, author_id, author_name, type, text, deleted, created_at')
+      .select(FULL)
       .eq('group_id', groupId)
       .order('created_at', { ascending: false }); // newest first → bottom of inverted list
+    if (error) {
+      const retry = await supabase
+        .from('posts')
+        .select(BASE)
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: false });
+      data = retry.data;
+      error = retry.error;
+    }
     if (!error) setMessages(data || []);
   }, [groupId]);
 
@@ -142,6 +166,101 @@ export default function FeedScreen({ route, navigation }) {
     setText('');
     setAnnounce(false);
     load();
+  }
+
+  // Read a local file into a body the storage client accepts on each platform,
+  // upload it to the public bucket, and post it as a message.
+  async function uploadAndSend({ uri, name, mime, kind }) {
+    setAttachOpen(false);
+    setUploading(true);
+    try {
+      const safeName = name || `${kind}-${Date.now()}`;
+      const ext = safeName.includes('.')
+        ? safeName.split('.').pop()
+        : (mime && mime.split('/')[1]) || 'bin';
+      const path = `${groupId}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      let body;
+      if (Platform.OS === 'web') {
+        const res = await fetch(uri);
+        body = await res.blob();
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        body = decode(base64);
+      }
+
+      const { error: upErr } = await supabase.storage
+        .from('attachments')
+        .upload(path, body, { contentType: mime || 'application/octet-stream', upsert: false });
+      if (upErr) throw upErr;
+
+      const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
+      const { error: insErr } = await supabase.from('posts').insert({
+        group_id: groupId,
+        author_id: user.id,
+        author_name: user.name,
+        type: 'Resource',
+        text: null,
+        attachment_url: pub.publicUrl,
+        attachment_type: kind === 'image' ? 'image' : 'file',
+        attachment_name: name || null,
+        attachment_mime: mime || null,
+      });
+      if (insErr) throw insErr;
+      load();
+    } catch (e) {
+      notify({ title: 'Could not send', message: (e && e.message) || 'Upload failed.' });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function pickImage(fromCamera) {
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setAttachOpen(false);
+      notify({
+        title: 'Permission needed',
+        message: fromCamera
+          ? 'Allow camera access to take a photo.'
+          : 'Allow photo access to share an image.',
+      });
+      return;
+    }
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
+    if (result.canceled) {
+      setAttachOpen(false);
+      return;
+    }
+    const asset = result.assets[0];
+    uploadAndSend({
+      uri: asset.uri,
+      name: asset.fileName || `photo-${Date.now()}.jpg`,
+      mime: asset.mimeType || 'image/jpeg',
+      kind: 'image',
+    });
+  }
+
+  async function pickDocument() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) {
+      setAttachOpen(false);
+      return;
+    }
+    const asset = result.assets[0];
+    uploadAndSend({
+      uri: asset.uri,
+      name: asset.name,
+      mime: asset.mimeType || 'application/octet-stream',
+      kind: 'file',
+    });
   }
 
   async function submitReport() {
@@ -246,6 +365,18 @@ export default function FeedScreen({ route, navigation }) {
         {/* Input bar — hidden when an Admin has disabled member posting. */}
         {canPost ? (
           <View style={[styles.inputBar, { paddingBottom: (insets.bottom || spacing.sm) + spacing.sm }]}>
+            <Pressable
+              onPress={() => setAttachOpen(true)}
+              disabled={uploading}
+              hitSlop={8}
+              style={styles.announceBtn}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.muted} />
+              ) : (
+                <Ionicons name="add" size={22} color={colors.inkSoft} />
+              )}
+            </Pressable>
             {isModerator ? (
               <Pressable
                 onPress={() => setAnnounce((a) => !a)}
@@ -282,6 +413,46 @@ export default function FeedScreen({ route, navigation }) {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Attachment picker */}
+      <Modal
+        visible={attachOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAttachOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setAttachOpen(false)}>
+          <Pressable style={styles.menu} onPress={() => {}}>
+            <Pressable
+              onPress={() => pickImage(false)}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+            >
+              <Ionicons name="image-outline" size={20} color={colors.inkSoft} />
+              <Text style={styles.menuText}>Photo library</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => pickImage(true)}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+            >
+              <Ionicons name="camera-outline" size={20} color={colors.inkSoft} />
+              <Text style={styles.menuText}>Take photo</Text>
+            </Pressable>
+            <Pressable
+              onPress={pickDocument}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
+            >
+              <Ionicons name="document-outline" size={20} color={colors.inkSoft} />
+              <Text style={styles.menuText}>File</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setAttachOpen(false)}
+              style={({ pressed }) => [styles.menuItem, styles.menuCancel, pressed && styles.pressed]}
+            >
+              <Text style={styles.menuCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* 3-dot header menu */}
       <Modal
@@ -427,9 +598,46 @@ function HeaderMenuRow({ icon, label, onPress }) {
   );
 }
 
+function AttachmentView({ post, own, onLongPress }) {
+  const url = post.attachment_url;
+  const open = () => Linking.openURL(url).catch(() => {});
+  if (post.attachment_type === 'image') {
+    return (
+      <Pressable onPress={open} onLongPress={onLongPress} delayLongPress={300}>
+        <Image source={{ uri: url }} style={styles.attachImage} resizeMode="cover" />
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      onPress={open}
+      onLongPress={onLongPress}
+      delayLongPress={300}
+      style={styles.fileChip}
+    >
+      <View style={[styles.fileIcon, own ? styles.fileIconOwn : styles.fileIconOther]}>
+        <Ionicons name="document-text-outline" size={20} color={own ? colors.onPrimary : colors.inkSoft} />
+      </View>
+      <View style={styles.fileMeta}>
+        <Text
+          style={[styles.fileName, { color: own ? colors.onPrimary : colors.ink }]}
+          numberOfLines={1}
+        >
+          {post.attachment_name || 'File'}
+        </Text>
+        <Text style={[styles.fileHint, { color: own ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+          Tap to open
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function Bubble({ post, own, onLongPress }) {
   const isAnnouncement = post.type === 'Announcement';
   const amber = roleTheme('Admin');
+  const hasAttach = !!post.attachment_url;
+  const imageOnly = post.attachment_type === 'image' && !post.text;
 
   if (post.deleted) {
     return (
@@ -461,8 +669,11 @@ function Bubble({ post, own, onLongPress }) {
   if (own) {
     return (
       <Pressable onLongPress={onLongPress} delayLongPress={300} style={styles.ownRow}>
-        <View style={styles.ownBubble}>
-          <Text style={styles.ownText}>{post.text}</Text>
+        <View style={[styles.ownBubble, imageOnly && styles.mediaBubble]}>
+          {hasAttach ? <AttachmentView post={post} own onLongPress={onLongPress} /> : null}
+          {post.text ? (
+            <Text style={[styles.ownText, hasAttach && styles.captionSpacing]}>{post.text}</Text>
+          ) : null}
         </View>
         <Text style={styles.ownTime}>{relTime(post.created_at)}</Text>
       </Pressable>
@@ -474,8 +685,11 @@ function Bubble({ post, own, onLongPress }) {
       <Avatar name={post.author_name || 'Member'} size={32} />
       <View style={styles.otherBody}>
         <Text style={styles.otherName}>{post.author_name || 'Group member'}</Text>
-        <View style={styles.otherBubble}>
-          <Text style={styles.otherText}>{post.text}</Text>
+        <View style={[styles.otherBubble, imageOnly && styles.mediaBubble]}>
+          {hasAttach ? <AttachmentView post={post} onLongPress={onLongPress} /> : null}
+          {post.text ? (
+            <Text style={[styles.otherText, hasAttach && styles.captionSpacing]}>{post.text}</Text>
+          ) : null}
         </View>
       </View>
       <Text style={styles.otherTime}>{relTime(post.created_at)}</Text>
@@ -606,6 +820,35 @@ const styles = StyleSheet.create({
   },
   ownText: { ...type.body, color: colors.onPrimary, lineHeight: 20 },
   ownTime: { ...type.caption, color: colors.muted, fontSize: 10, marginLeft: 6, marginBottom: 2 },
+
+  // attachments
+  mediaBubble: { padding: 3 },
+  captionSpacing: { marginTop: spacing.sm },
+  attachImage: {
+    width: 210,
+    height: 210,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+  },
+  fileChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minWidth: 180,
+    maxWidth: 240,
+  },
+  fileIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileIconOwn: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  fileIconOther: { backgroundColor: colors.surface },
+  fileMeta: { flex: 1 },
+  fileName: { ...type.bodyStrong, fontSize: 14 },
+  fileHint: { ...type.caption, fontSize: 11, marginTop: 1 },
 
   // deleted placeholder
   deletedRow: { alignItems: 'flex-start', marginBottom: spacing.md },

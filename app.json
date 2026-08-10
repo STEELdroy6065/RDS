@@ -16,14 +16,22 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Synq to use your camera to scan a group's QR code and join."
+          "cameraPermission": "Allow RDS to use your camera to scan a group's QR code and take photos to share."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow RDS to access your photos so you can share images in the group feed.",
+          "cameraPermission": "Allow RDS to use your camera to take a photo to share."
         }
       ]
     ],
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow Synq to use your camera to scan a group's QR code and join."
+        "NSCameraUsageDescription": "Allow RDS to use your camera to scan a group's QR code and take photos to share.",
+        "NSPhotoLibraryUsageDescription": "Allow RDS to access your photos so you can share images in the group feed."
       }
     },
     "android": {

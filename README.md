@@ -40,6 +40,7 @@ In the Supabase dashboard → **SQL Editor**, run these files (in order):
 6. [`supabase/notifications.sql`](supabase/notifications.sql) — `notifications` table, RLS, and the triggers/function that populate it.
 7. [`supabase/deletions.sql`](supabase/deletions.sql) — deletion controls: a `deleted` column + `delete_post()` for messages, and leave/delete-group and delete-vote RLS policies.
 8. [`supabase/group_info.sql`](supabase/group_info.sql) — a group `description` column, Admin-configurable member-permission toggles (post / invite / view members), a `groups` update policy, and server-side enforcement of the "members can post" toggle.
+9. [`supabase/attachments.sql`](supabase/attachments.sql) — attachment columns on `posts`, and a public `attachments` Storage bucket (authenticated upload, public read) for images and files shared in the feed.
 
 Each is idempotent (safe to re-run).
 
@@ -187,6 +188,7 @@ supabase/
   notifications.sql        Notifications table + RLS + triggers/function
   deletions.sql            Soft-delete messages + leave/delete policies
   group_info.sql           Group description + member permission toggles
+  attachments.sql          Post attachment columns + Storage bucket + policies
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 
@@ -224,9 +226,13 @@ each group. The missed-check-in state is computed on read (past the deadline
 with no record today), so there's no scheduled job. RLS: only Admin/Teacher can
 submit, only the Captain can resolve a miss, all members can read.
 
-**Also real: Feed** (`supabase/feed.sql`) — a `posts` table; any group member
-can post (Announcement / Resource / Discussion), and RLS limits reading and
-posting to members.
+**Also real: Feed** (`supabase/feed.sql`, `supabase/attachments.sql`) — a
+`posts` table; any group member can post (Announcement / Resource / Discussion),
+and RLS limits reading and posting to members. Messages can carry an
+**attachment** — an image (from the photo library or camera) or a file (via the
+document picker) — uploaded to a public Supabase **Storage** bucket and rendered
+inline (image thumbnail, or a tappable file chip). Shared images also surface in
+the group's **Media & links** tab.
 
 **Also real: Notifications** (`supabase/notifications.sql`) — a `notifications`
 table populated **server-side by triggers**: a new vote or a new Announcement
