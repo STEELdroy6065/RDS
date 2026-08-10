@@ -44,13 +44,17 @@ In the Supabase dashboard → **SQL Editor**, run these files (in order):
 
 Each is idempotent (safe to re-run).
 
-#### Optional: the "Catch me up" AI summary
+#### Optional: the AI features (Catch me up + Home assistant)
 
-The Feed's **Catch me up** button summarizes unread messages via an
-[Edge Function](supabase/functions/catch-me-up/index.ts) that calls an AI
-**server-side** — so the API key never ships in the app bundle. It's optional;
-the rest of the app works without it, and it picks its provider from whichever
-secret you set. You need the [Supabase CLI](https://supabase.com/docs/guides/cli).
+Two AI features run through **Edge Functions** that call an AI **server-side** —
+so the API key never ships in the app bundle: the Feed's **Catch me up**
+([catch-me-up](supabase/functions/catch-me-up/index.ts)) summary, and the **AI
+assistant** on Home ([assistant](supabase/functions/assistant/index.ts)) — the
+sparkle button in the search bar, a conversational panel that answers using your
+real data (groups, open votes, today's attendance, recent feed) and drafts
+messages. Both are optional; the rest of the app works without them, and both
+read whichever provider secret you set. You need the
+[Supabase CLI](https://supabase.com/docs/guides/cli).
 
 **Free option — Groq** (free, no billing, no region limits). Get a key at
 [console.groq.com/keys](https://console.groq.com/keys), then:
@@ -59,7 +63,11 @@ secret you set. You need the [Supabase CLI](https://supabase.com/docs/guides/cli
 export SUPABASE_ACCESS_TOKEN=sbp_...   # from supabase.com/dashboard/account/tokens
 npx supabase secrets set GROQ_API_KEY=gsk_... --project-ref <your-project-ref>
 npx supabase functions deploy catch-me-up --project-ref <your-project-ref>
+npx supabase functions deploy assistant  --project-ref <your-project-ref>
 ```
+
+The secret is project-wide, so both functions share it — you set the key once
+and deploy each function.
 
 **Other providers** — set one of these secrets instead:
 `GEMINI_API_KEY` (Google Gemini, free tier where available) or `ANTHROPIC_API_KEY`

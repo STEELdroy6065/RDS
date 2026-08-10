@@ -14,6 +14,7 @@ import GroupCard from '../components/GroupCard';
 import SectionLabel from '../components/SectionLabel';
 import Avatar from '../components/Avatar';
 import AvatarMenu from '../components/AvatarMenu';
+import AssistantPanel from '../components/AssistantPanel';
 import { useStatusBar } from '../components/useStatusBar';
 import { colors, spacing, radius, type } from '../theme';
 import { useSession } from '../state/session';
@@ -64,6 +65,7 @@ export default function HomeScreen({ navigation }) {
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [messageHits, setMessageHits] = useState([]);
   const q = query.trim();
@@ -182,6 +184,13 @@ export default function HomeScreen({ navigation }) {
               <Ionicons name="close-circle" size={18} color={colors.muted} />
             </Pressable>
           ) : null}
+          <Pressable
+            onPress={() => setAssistantOpen(true)}
+            hitSlop={8}
+            style={styles.aiBtn}
+          >
+            <Ionicons name="sparkles" size={18} color={colors.onPrimary} />
+          </Pressable>
         </View>
 
         {searching ? (
@@ -230,6 +239,8 @@ export default function HomeScreen({ navigation }) {
         avatarColor={HEADER_AVATAR_COLOR}
         items={menuItems}
       />
+
+      <AssistantPanel visible={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </Screen>
   );
 }
@@ -351,6 +362,14 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.ink,
     padding: 0,
+  },
+  aiBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: { marginTop: spacing.xs },
   empty: {
