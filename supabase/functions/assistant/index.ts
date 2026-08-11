@@ -136,8 +136,12 @@ async function toolWhatsHappening(ctx: Ctx): Promise<ToolResult> {
   return { text: lines.join('\n') };
 }
 
-const FILE_COLS =
-  'id, group_id, author_name, attachment_name, attachment_type, attachment_url, attachment_text, created_at';
+// Base columns never include attachment_text, so filename/sender queries can't
+// break if the extraction migration hasn't been run; only content/read queries
+// add it (and degrade to [] via rows() when the column is absent).
+const FILE_BASE =
+  'id, group_id, author_name, attachment_name, attachment_type, attachment_url, created_at';
+const FILE_WITH_TEXT = `${FILE_BASE}, attachment_text`;
 const esc = (s: string) => String(s).replace(/[\\%_]/g, '\\$&');
 
 function snippetAround(text: string, term: string): string {
@@ -154,8 +158,8 @@ async function toolFindFiles(ctx: Ctx, args: any): Promise<ToolResult> {
   const ids = resolveGroups(ctx, args.group).map((g) => g.id);
   const term = args.name || args.content;
 
-  const base = () => {
-    let b = ctx.sb.from('posts').select(FILE_COLS)
+  const base = (cols: string) => {
+    let b = ctx.sb.from('posts').select(cols)
       .eq('deleted', false).not('attachment_url', 'is', null).in('group_id', ids)
       .order('created_at', { ascending: false }).limit(12);
     if (args.kind === 'image') b = b.eq('attachment_type', 'image');
@@ -169,10 +173,10 @@ async function toolFindFiles(ctx: Ctx, args: any): Promise<ToolResult> {
   // Match by filename and/or by extracted content, then merge.
   const queries: any[] = [];
   if (term) {
-    queries.push(base().ilike('attachment_name', `%${esc(term)}%`));
-    queries.push(base().ilike('attachment_text', `%${esc(term)}%`));
+    queries.push(base(FILE_BASE).ilike('attachment_name', `%${esc(term)}%`));
+    queries.push(base(FILE_WITH_TEXT).ilike('attachment_text', `%${esc(term)}%`));
   } else {
-    queries.push(base()); // no term → just filter by sender/kind/date
+    queries.push(base(FILE_BASE)); // no term → just filter by sender/kind/date
   }
   const results = await Promise.all(queries.map((q) => rows(q)));
 
@@ -207,7 +211,7 @@ async function toolReadFile(ctx: Ctx, args: any): Promise<ToolResult> {
   const ids = resolveGroups(ctx, args.group).map((g) => g.id);
   const term = args.name || args.query;
   const build = (col: string) => {
-    let b = ctx.sb.from('posts').select(FILE_COLS)
+    let b = ctx.sb.from('posts').select(FILE_WITH_TEXT)
       .eq('deleted', false).not('attachment_text', 'is', null).in('group_id', ids)
       .order('created_at', { ascending: false }).limit(3);
     if (args.sender) b = b.ilike('author_name', `%${esc(args.sender)}%`);

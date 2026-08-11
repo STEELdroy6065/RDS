@@ -45,8 +45,12 @@ export async function searchAll(rawQuery, { groups = [], user } = {}) {
   if (groupIds.length === 0) return { ...EMPTY, groups: groupHits };
 
   const pattern = likePattern(q);
-  const FILE_COLS =
-    'id, group_id, author_name, attachment_name, attachment_type, attachment_url, attachment_text, created_at';
+  // Filename query never selects attachment_text, so it can't break if the
+  // extraction migration hasn't been run. Only the content query references it,
+  // and that one degrades gracefully (safe() → []) when the column is absent.
+  const FILE_BASE =
+    'id, group_id, author_name, attachment_name, attachment_type, attachment_url, created_at';
+  const FILE_WITH_TEXT = `${FILE_BASE}, attachment_text`;
 
   const [msgRows, fileByName, fileByContent, voteRows, peopleRows] = await Promise.all([
     safe(
@@ -62,7 +66,7 @@ export async function searchAll(rawQuery, { groups = [], user } = {}) {
     safe(
       supabase
         .from('posts')
-        .select(FILE_COLS)
+        .select(FILE_BASE)
         .in('group_id', groupIds)
         .eq('deleted', false)
         .ilike('attachment_name', pattern)
@@ -72,7 +76,7 @@ export async function searchAll(rawQuery, { groups = [], user } = {}) {
     safe(
       supabase
         .from('posts')
-        .select(FILE_COLS)
+        .select(FILE_WITH_TEXT)
         .in('group_id', groupIds)
         .eq('deleted', false)
         .ilike('attachment_text', pattern)
