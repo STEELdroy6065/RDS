@@ -41,6 +41,7 @@ In the Supabase dashboard → **SQL Editor**, run these files (in order):
 7. [`supabase/deletions.sql`](supabase/deletions.sql) — deletion controls: a `deleted` column + `delete_post()` for messages, and leave/delete-group and delete-vote RLS policies.
 8. [`supabase/group_info.sql`](supabase/group_info.sql) — a group `description` column, Admin-configurable member-permission toggles (post / invite / view members), a `groups` update policy, and server-side enforcement of the "members can post" toggle.
 9. [`supabase/attachments.sql`](supabase/attachments.sql) — attachment columns on `posts`, and a public `attachments` Storage bucket (authenticated upload, public read) for images and files shared in the feed.
+10. [`supabase/extraction.sql`](supabase/extraction.sql) — an `attachment_text` column (extracted file text / image OCR + description) with a trigram index for fast content search.
 
 Each is idempotent (safe to re-run).
 
@@ -69,10 +70,20 @@ export SUPABASE_ACCESS_TOKEN=sbp_...   # from supabase.com/dashboard/account/tok
 npx supabase secrets set GROQ_API_KEY=gsk_... --project-ref <your-project-ref>
 npx supabase functions deploy catch-me-up --project-ref <your-project-ref>
 npx supabase functions deploy assistant  --project-ref <your-project-ref>
+npx supabase functions deploy extract    --project-ref <your-project-ref>
 ```
 
-The secret is project-wide, so both functions share it — you set the key once
-and deploy each function.
+The secret is project-wide, so all three functions share it — you set the key
+once and deploy each function.
+
+**File text extraction** ([extract](supabase/functions/extract/index.ts)) runs
+when a file is uploaded: PDF/docx/pptx are parsed in plain code (free); images
+get OCR + a one-line description via a **vision model** (`GROQ_VISION_MODEL`,
+default `meta-llama/llama-4-scout-17b-16e-instruct` — override if Groq changes
+its vision model id). That vision call is the one AI cost source separate from
+the Groq text model. The extracted text is stored on the post so both search
+and the assistant can see inside files. Extraction is best-effort — if it fails,
+the file still works, it just isn't content-searchable.
 
 **Other providers** — set one of these secrets instead:
 `GEMINI_API_KEY` (Google Gemini, free tier where available) or `ANTHROPIC_API_KEY`
@@ -227,6 +238,8 @@ supabase/
   deletions.sql            Soft-delete messages + leave/delete policies
   group_info.sql           Group description + member permission toggles
   attachments.sql          Post attachment columns + Storage bucket + policies
+  extraction.sql           Extracted file text/OCR column + trigram index
+  functions/               Edge Functions: catch-me-up, assistant, extract
 .env.example               Template for Supabase env vars (copy to .env)
 ```
 

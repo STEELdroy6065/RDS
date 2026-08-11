@@ -136,40 +136,105 @@ async function toolWhatsHappening(ctx: Ctx): Promise<ToolResult> {
   return { text: lines.join('\n') };
 }
 
-async function toolFindFiles(ctx: Ctx, args: any): Promise<ToolResult> {
-  const groups = resolveGroups(ctx, args.group);
-  const ids = groups.map((g) => g.id);
-  let b = ctx.sb.from('posts')
-    .select('group_id, author_name, attachment_name, attachment_type, attachment_url, created_at')
-    .eq('deleted', false).not('attachment_url', 'is', null).in('group_id', ids)
-    .order('created_at', { ascending: false }).limit(12);
-  if (args.kind === 'image') b = b.eq('attachment_type', 'image');
-  else if (args.kind === 'file') b = b.neq('attachment_type', 'image');
-  if (args.name) b = b.ilike('attachment_name', `%${String(args.name).replace(/[\\%_]/g, '\\$&')}%`);
-  if (args.sender) b = b.ilike('author_name', `%${String(args.sender).replace(/[\\%_]/g, '\\$&')}%`);
-  if (args.since) b = b.gte('created_at', String(args.since));
-  if (args.until) b = b.lte('created_at', String(args.until));
+const FILE_COLS =
+  'id, group_id, author_name, attachment_name, attachment_type, attachment_url, attachment_text, created_at';
+const esc = (s: string) => String(s).replace(/[\\%_]/g, '\\$&');
 
-  const found = await rows(b);
+function snippetAround(text: string, term: string): string {
+  if (!text) return '';
+  const clean = text.replace(/\s+/g, ' ').trim();
+  const idx = clean.toLowerCase().indexOf((term || '').toLowerCase());
+  if (idx < 0 || !term) return clean.slice(0, 160);
+  const s = Math.max(0, idx - 50);
+  const e = Math.min(clean.length, idx + term.length + 90);
+  return (s > 0 ? '…' : '') + clean.slice(s, e) + (e < clean.length ? '…' : '');
+}
+
+async function toolFindFiles(ctx: Ctx, args: any): Promise<ToolResult> {
+  const ids = resolveGroups(ctx, args.group).map((g) => g.id);
+  const term = args.name || args.content;
+
+  const base = () => {
+    let b = ctx.sb.from('posts').select(FILE_COLS)
+      .eq('deleted', false).not('attachment_url', 'is', null).in('group_id', ids)
+      .order('created_at', { ascending: false }).limit(12);
+    if (args.kind === 'image') b = b.eq('attachment_type', 'image');
+    else if (args.kind === 'file') b = b.neq('attachment_type', 'image');
+    if (args.sender) b = b.ilike('author_name', `%${esc(args.sender)}%`);
+    if (args.since) b = b.gte('created_at', String(args.since));
+    if (args.until) b = b.lte('created_at', String(args.until));
+    return b;
+  };
+
+  // Match by filename and/or by extracted content, then merge.
+  const queries: any[] = [];
+  if (term) {
+    queries.push(base().ilike('attachment_name', `%${esc(term)}%`));
+    queries.push(base().ilike('attachment_text', `%${esc(term)}%`));
+  } else {
+    queries.push(base()); // no term → just filter by sender/kind/date
+  }
+  const results = await Promise.all(queries.map((q) => rows(q)));
+
+  const byId: Record<string, any> = {};
+  results.flat().forEach((f: any) => (byId[f.id] = f));
+  const found = Object.values(byId)
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 12);
   if (found.length === 0) return { text: 'No matching files or images were found.' };
 
   const attachments: Attachment[] = [];
-  const seen = new Set<string>();
   const lines = found.map((f: any) => {
-    if (f.attachment_url && !seen.has(f.attachment_url)) {
-      seen.add(f.attachment_url);
-      attachments.push({
-        url: f.attachment_url,
-        name: f.attachment_name || (f.attachment_type === 'image' ? 'image' : 'file'),
-        type: f.attachment_type === 'image' ? 'image' : 'file',
-      });
-    }
+    attachments.push({
+      url: f.attachment_url,
+      name: f.attachment_name || (f.attachment_type === 'image' ? 'image' : 'file'),
+      type: f.attachment_type === 'image' ? 'image' : 'file',
+    });
     const gname = (ctx.byId[f.group_id] || {}).name || 'a group';
-    return `- ${f.attachment_type === 'image' ? 'image' : 'file'} "${f.attachment_name || 'untitled'}" from ${
+    let line = `- ${f.attachment_type === 'image' ? 'image' : 'file'} "${f.attachment_name || 'untitled'}" from ${
       f.author_name || 'someone'
     } in ${gname} on ${day(f.created_at)}`;
+    if (term && f.attachment_text && f.attachment_text.toLowerCase().includes(String(term).toLowerCase())) {
+      line += `\n    match: "${snippetAround(f.attachment_text, term)}"`;
+    }
+    return line;
   });
   return { text: `Found ${found.length}:\n${lines.join('\n')}`, attachments: attachments.slice(0, 6) };
+}
+
+// Return a file's already-extracted text so the model can analyze/summarize it.
+async function toolReadFile(ctx: Ctx, args: any): Promise<ToolResult> {
+  const ids = resolveGroups(ctx, args.group).map((g) => g.id);
+  const term = args.name || args.query;
+  const build = (col: string) => {
+    let b = ctx.sb.from('posts').select(FILE_COLS)
+      .eq('deleted', false).not('attachment_text', 'is', null).in('group_id', ids)
+      .order('created_at', { ascending: false }).limit(3);
+    if (args.sender) b = b.ilike('author_name', `%${esc(args.sender)}%`);
+    if (term) b = b.ilike(col, `%${esc(term)}%`);
+    return b;
+  };
+  let found = term ? await rows(build('attachment_name')) : await rows(build('attachment_name'));
+  if (found.length === 0 && term) found = await rows(build('attachment_text'));
+  if (found.length === 0) {
+    return { text: 'No file with readable text matched. (Files are readable once their text has been extracted.)' };
+  }
+  const f: any = found[0];
+  const gname = (ctx.byId[f.group_id] || {}).name || 'a group';
+  const body = String(f.attachment_text || '').slice(0, 8000);
+  return {
+    text:
+      `Contents of "${f.attachment_name || 'file'}" (shared by ${f.author_name || 'someone'} in ${gname} on ${day(
+        f.created_at
+      )}):\n\n${body}`,
+    attachments: [
+      {
+        url: f.attachment_url,
+        name: f.attachment_name || 'file',
+        type: f.attachment_type === 'image' ? 'image' : 'file',
+      },
+    ],
+  };
 }
 
 async function toolCheckAttendance(ctx: Ctx, args: any): Promise<ToolResult> {
@@ -301,11 +366,12 @@ const TOOL_DEFS = [
   {
     name: 'find_files',
     description:
-      'Find files/images shared in the feed by name, sender, group, date range, and/or kind. Use for "find the PDF", "images Grace shared", "files from last week". Prefer sender/kind/date over name for images (they rarely have meaningful filenames).',
+      'Find files/images shared in the feed by name, by what is INSIDE them (extracted/OCR text), sender, group, date range, and/or kind. Use for "find the PDF", "the handout about photosynthesis", "images Grace shared", "files from last week". Prefer sender/kind/date over name for images (they rarely have meaningful filenames); use `content` to search inside files.',
     parameters: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'part of the filename' },
+        content: { type: 'string', description: 'text expected INSIDE the file/image' },
         sender: { type: 'string', description: 'who shared it' },
         group: { type: 'string', description: 'group name (optional)' },
         kind: { type: 'string', enum: ['image', 'file', 'any'], description: 'restrict to images or documents' },
@@ -314,6 +380,21 @@ const TOOL_DEFS = [
       },
     },
     run: (ctx: Ctx, a: any) => toolFindFiles(ctx, a),
+  },
+  {
+    name: 'read_file',
+    description:
+      "Read a file's already-extracted text so you can analyze or summarize it. Use when asked to 'summarize the PDF', 'what does this handout say', 'analyze the document/photo'. Works for PDFs, docx, pptx, and images (OCR + description) alike, since the text was extracted at upload.",
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'part of the filename' },
+        query: { type: 'string', description: 'text expected inside it (optional)' },
+        sender: { type: 'string', description: 'who shared it (optional)' },
+        group: { type: 'string', description: 'group name (optional)' },
+      },
+    },
+    run: (ctx: Ctx, a: any) => toolReadFile(ctx, a),
   },
   {
     name: 'check_attendance',

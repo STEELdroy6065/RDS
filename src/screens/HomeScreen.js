@@ -216,7 +216,44 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-function ResultRow({ icon, title, meta, onPress }) {
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(undefined, opts);
+}
+
+// Renders `text` with each case-insensitive occurrence of `query` emphasized
+// (bold ink) against the muted body — a monochrome search highlight.
+function Highlight({ text, query, style, numberOfLines }) {
+  if (!text) return null;
+  const runs = [];
+  const low = text.toLowerCase();
+  const qlow = (query || '').toLowerCase();
+  if (qlow) {
+    let i = 0;
+    while (i < text.length) {
+      const idx = low.indexOf(qlow, i);
+      if (idx < 0) {
+        runs.push({ t: text.slice(i), h: false });
+        break;
+      }
+      if (idx > i) runs.push({ t: text.slice(i, idx), h: false });
+      runs.push({ t: text.slice(idx, idx + query.length), h: true });
+      i = idx + query.length;
+    }
+  } else {
+    runs.push({ t: text, h: false });
+  }
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {runs.map((r, k) => (r.h ? <Text key={k} style={styles.hl}>{r.t}</Text> : r.t))}
+    </Text>
+  );
+}
+
+function ResultRow({ icon, title, snippet, query, meta, onPress }) {
   return (
     <Pressable
       onPress={onPress}
@@ -226,7 +263,10 @@ function ResultRow({ icon, title, meta, onPress }) {
         <Ionicons name={icon} size={18} color={colors.inkSoft} />
       </View>
       <View style={styles.msgBody}>
-        <Text style={styles.msgText} numberOfLines={2}>{title}</Text>
+        <Text style={styles.msgText} numberOfLines={1}>{title}</Text>
+        {snippet ? (
+          <Highlight text={snippet} query={query} style={styles.msgSnippet} numberOfLines={2} />
+        ) : null}
         {meta ? <Text style={styles.msgMeta} numberOfLines={1}>{meta}</Text> : null}
       </View>
     </Pressable>
@@ -267,8 +307,10 @@ function SearchResults({ query, results, navigation }) {
             <ResultRow
               key={m.id}
               icon="chatbubble-ellipses-outline"
-              title={m.text}
-              meta={`${m.groupName}${m.author_name ? ` · ${m.author_name}` : ''} · ${relTime(m.created_at)}`}
+              title={m.groupName}
+              snippet={m.snippet}
+              query={query}
+              meta={`${m.author_name || 'Member'} · ${fmtDate(m.created_at)}`}
               onPress={() => toFeed(m.group_id, m.groupName)}
             />
           ))}
@@ -283,7 +325,9 @@ function SearchResults({ query, results, navigation }) {
               key={f.id}
               icon={f.attachment_type === 'image' ? 'image-outline' : 'document-outline'}
               title={f.attachment_name || 'Attachment'}
-              meta={`${f.groupName}${f.author_name ? ` · ${f.author_name}` : ''} · ${relTime(f.created_at)}`}
+              snippet={f.snippet}
+              query={query}
+              meta={`${f.groupName} · ${fmtDate(f.created_at)}`}
               onPress={() => toFeed(f.group_id, f.groupName)}
             />
           ))}
@@ -430,6 +474,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   msgBody: { flex: 1, marginLeft: spacing.md },
-  msgText: { ...type.body, color: colors.ink, lineHeight: 20 },
-  msgMeta: { ...type.caption, color: colors.muted, marginTop: 3 },
+  msgText: { ...type.bodyStrong, color: colors.ink },
+  msgSnippet: { ...type.caption, color: colors.muted, marginTop: 2, lineHeight: 18 },
+  hl: { ...type.caption, color: colors.ink, fontWeight: '700' },
+  msgMeta: { ...type.caption, color: colors.muted, marginTop: 3, fontSize: 11 },
 });

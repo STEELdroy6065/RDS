@@ -287,18 +287,27 @@ export default function FeedScreen({ route, navigation }) {
         for (let i = 0; i < pending.length; i++) {
           const att = pending[i];
           const url = await uploadOne(att);
-          const { error } = await supabase.from('posts').insert({
-            group_id: groupId,
-            author_id: user.id,
-            author_name: user.name,
-            type: 'Resource',
-            text: i === 0 && body ? body : null,
-            attachment_url: url,
-            attachment_type: att.kind === 'image' ? 'image' : 'file',
-            attachment_name: att.name || null,
-            attachment_mime: att.mime || null,
-          });
+          const { data: inserted, error } = await supabase
+            .from('posts')
+            .insert({
+              group_id: groupId,
+              author_id: user.id,
+              author_name: user.name,
+              type: 'Resource',
+              text: i === 0 && body ? body : null,
+              attachment_url: url,
+              attachment_type: att.kind === 'image' ? 'image' : 'file',
+              attachment_name: att.name || null,
+              attachment_mime: att.mime || null,
+            })
+            .select('id')
+            .single();
           if (error) throw error;
+          // Fire-and-forget: extract the file's text so it's searchable and the
+          // assistant can read it. Never blocks sending; ignore failures.
+          if (inserted && inserted.id) {
+            supabase.functions.invoke('extract', { body: { postId: inserted.id } }).catch(() => {});
+          }
         }
       } else {
         const { error } = await supabase.from('posts').insert({
