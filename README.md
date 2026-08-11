@@ -50,12 +50,15 @@ Two AI features run through **Edge Functions** that call an AI **server-side** �
 so the API key never ships in the app bundle: the Feed's **Catch me up**
 ([catch-me-up](supabase/functions/catch-me-up/index.ts)) summary, and the **AI
 assistant** on Home ([assistant](supabase/functions/assistant/index.ts)) — the
-sparkle button in the search bar, a conversational panel that answers using your
-real data (groups, open votes, today's attendance, recent feed), drafts
-messages, and can **search** your feed messages, shared files, votes and people
-(a `search_rds` tool the model calls server-side, RLS-scoped to your groups).
-Both are optional; the rest of the app works without them, and both read
-whichever provider secret you set. You need the
+sparkle button in the search bar, a conversational panel. The assistant answers
+lookups with **targeted query tools** (not a context dump): `whats_happening`,
+`find_files`, `check_attendance`, `list_votes`, `list_members`, `activity_counts`
+and `get_messages` — each a precise, RLS-scoped database query the model calls,
+so it stays fast whether a group has 10 messages or 10,000. The AI is used only
+to phrase the final answer (and for drafting / summaries / open-ended chat).
+Files and images it retrieves are attached inline in its reply. Both features
+are optional; the rest of the app works without them, and both read whichever
+provider secret you set. You need the
 [Supabase CLI](https://supabase.com/docs/guides/cli).
 
 **Free option — Groq** (free, no billing, no region limits). Get a key at

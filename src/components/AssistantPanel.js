@@ -15,126 +15,30 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius, type } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
 
-function todayStr() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-function relDay(iso) {
-  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 3600000));
-  if (s < 1) return 'recent';
-  if (s < 24) return `${s}h ago`;
-  return `${Math.floor(s / 24)}d ago`;
-}
-
-// Pull together the user's real data as a compact context blob for the AI.
-async function buildContext(groups) {
-  const groupIds = groups.map((g) => g.id);
-  if (groupIds.length === 0) return { text: 'The user is not in any groups yet.', mostActive: null };
-
-  const nameById = {};
-  groups.forEach((g) => (nameById[g.id] = g.name));
-  const today = todayStr();
-
-  const safe = async (p) => {
-    try {
-      const { data } = await p;
-      return data || [];
-    } catch {
-      return [];
-    }
-  };
-
-  const [votes, att, posts] = await Promise.all([
-    safe(
-      supabase
-        .from('votes')
-        .select('group_id, question, status')
-        .in('group_id', groupIds)
-        .eq('status', 'open')
-    ),
-    safe(
-      supabase
-        .from('attendance_records')
-        .select('group_id, status, present_count, total_count')
-        .in('group_id', groupIds)
-        .eq('date', today)
-    ),
-    safe(
-      supabase
-        .from('posts')
-        .select('group_id, author_name, type, text, attachment_type, attachment_name, created_at, deleted')
-        .in('group_id', groupIds)
-        .order('created_at', { ascending: false })
-        .limit(40)
-    ),
-  ]);
-
-  const livePosts = posts.filter((p) => !p.deleted);
-
-  // Most active group by recent post count.
-  const tally = {};
-  livePosts.forEach((p) => (tally[p.group_id] = (tally[p.group_id] || 0) + 1));
-  let mostActiveId = groupIds[0];
-  let best = -1;
-  Object.entries(tally).forEach(([gid, n]) => {
-    if (n > best) {
-      best = n;
-      mostActiveId = gid;
-    }
-  });
-  const mostActive = nameById[mostActiveId] || (groups[0] && groups[0].name) || null;
-
-  const lines = [];
-  lines.push(`Groups (${groups.length}):`);
-  groups.forEach((g) =>
-    lines.push(`- ${g.name} — your role: ${g.role}, ${g.members} member(s)`)
+// The assistant fetches its own data via server-side query tools now, so the
+// client only sends a lightweight picture: the group list, and the per-group
+// "last opened" timestamps (used for unread counts).
+async function gatherLastSeen(groups) {
+  const map = {};
+  await Promise.all(
+    groups.map(async (g) => {
+      try {
+        const v = await AsyncStorage.getItem(`lastSeen:${g.id}`);
+        if (v) map[g.id] = v;
+      } catch {
+        /* ignore */
+      }
+    })
   );
-
-  lines.push('', 'Open votes:');
-  if (votes.length === 0) lines.push('- none');
-  else votes.forEach((v) => lines.push(`- ${nameById[v.group_id] || 'Group'}: "${v.question}"`));
-
-  lines.push('', `Attendance today (${today}):`);
-  groups.forEach((g) => {
-    const rec = att.find((a) => a.group_id === g.id);
-    if (!rec) lines.push(`- ${g.name}: not marked yet`);
-    else if (rec.status === 'submitted')
-      lines.push(
-        `- ${g.name}: marked${
-          rec.present_count != null ? ` (${rec.present_count}/${rec.total_count} present)` : ''
-        }`
-      );
-    else lines.push(`- ${g.name}: ${rec.status.replace(/_/g, ' ')}`);
-  });
-
-  lines.push('', 'Recent messages (newest first):');
-  if (livePosts.length === 0) lines.push('- none');
-  else
-    livePosts.slice(0, 25).forEach((p) => {
-      const text = (p.text || '').trim();
-      const attach =
-        p.attachment_type === 'image'
-          ? `[image${p.attachment_name ? `: ${p.attachment_name}` : ''}]`
-          : p.attachment_type
-          ? `[file${p.attachment_name ? `: ${p.attachment_name}` : ''}]`
-          : '';
-      const body = [text, attach].filter(Boolean).join(' ');
-      lines.push(
-        `- ${nameById[p.group_id] || 'Group'} · ${p.author_name || 'Member'}${
-          p.type === 'Announcement' ? ' (ANNOUNCEMENT)' : ''
-        } [${relDay(p.created_at)}]: ${body}`
-      );
-    });
-
-  return { text: lines.join('\n'), mostActive };
+  return map;
 }
+
 
 // Renders a file/image the assistant retrieved — the same file in its original
 // group (no copy), tappable to open/download like in Feed.
@@ -168,7 +72,6 @@ export default function AssistantPanel({ visible, onClose }) {
   const [conversation, setConversation] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [ctx, setCtx] = useState(null); // { text, mostActive }
   const scrollRef = useRef(null);
 
   // Reset the conversation only when the panel opens — NOT when `groups`
@@ -178,24 +81,13 @@ export default function AssistantPanel({ visible, onClose }) {
     if (visible) {
       setConversation([]);
       setInput('');
-      setCtx(null);
     }
   }, [visible]);
 
-  // Build (and refresh) the data context while open, without touching the
-  // conversation.
-  useEffect(() => {
-    if (!visible) return;
-    let active = true;
-    buildContext(groups).then((c) => {
-      if (active) setCtx(c);
-    });
-    return () => {
-      active = false;
-    };
-  }, [visible, groups]);
-
-  const mostActive = (ctx && ctx.mostActive) || (groups[0] && groups[0].name) || 'your group';
+  const mostActive =
+    [...groups].sort((a, b) => (b.members || 0) - (a.members || 0))[0]?.name ||
+    (groups[0] && groups[0].name) ||
+    'your group';
   const suggestions = [
     "What's happening in my groups today?",
     'Draft an announcement',
@@ -210,19 +102,28 @@ export default function AssistantPanel({ visible, onClose }) {
     setInput('');
     setLoading(true);
     try {
-      // Make sure context is ready (panel may have just opened).
-      let context = ctx;
-      if (!context) {
-        context = await buildContext(groups);
-        setCtx(context);
-      }
+      // Lightweight state for the server tools: the group list + per-group
+      // "last opened" times (for unread). The assistant queries everything
+      // else itself.
+      const lastSeen = await gatherLastSeen(groups);
+      const groupsPayload = groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        role: g.role,
+        members: g.members,
+      }));
       // Send the real conversation for follow-up context, minus any error
       // placeholders (those aren't genuine assistant turns).
       const history = next
         .filter((m) => !m.error)
         .map((m) => ({ role: m.role, content: m.content }));
       const { data, error } = await supabase.functions.invoke('assistant', {
-        body: { messages: history, context: context.text, userName: user && user.name },
+        body: {
+          messages: history,
+          userName: user && user.name,
+          groups: groupsPayload,
+          lastSeen,
+        },
       });
       if (error) {
         // supabase-js hides the function's real error behind a generic
