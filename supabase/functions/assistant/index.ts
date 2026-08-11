@@ -69,6 +69,10 @@ function systemPrompt(userName: string, context: string): string {
     `message, a shared file/PDF, a vote, or a person), call the search_rds tool and ` +
     `answer from what it returns. If search returns no matches, say so plainly — never ` +
     `invent a result. If something isn't in the context or search, say you don't have it.\n\n` +
+    `When search finds files or images, they are automatically attached to your reply ` +
+    `for the user to open — so just refer to them naturally by name (e.g. "Here's ` +
+    `notes.pdf that Grace shared"). Do NOT paste raw URLs and do NOT tell the user to go ` +
+    `find the file themselves.\n\n` +
     `You can also draft text on request (an announcement, a message, a poll question): ` +
     `write it ready to paste, concise, and never claim you posted or sent it — the user ` +
     `pastes it into RDS themselves. You cannot take actions in the app (post, vote, mark ` +
@@ -80,9 +84,12 @@ function systemPrompt(userName: string, context: string): string {
 
 // --- Server-side search (scoped to the caller via RLS) ---------------------
 
-async function runSearch(sb: any, query: string): Promise<string> {
+type Attachment = { url: string; name: string; type: 'image' | 'file' };
+type SearchResult = { text: string; attachments: Attachment[] };
+
+async function runSearch(sb: any, query: string): Promise<SearchResult> {
   const q = (query || '').trim();
-  if (!q) return 'No search query was provided.';
+  if (!q) return { text: 'No search query was provided.', attachments: [] };
   const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
   const safe = async (p: any) => {
     try {
@@ -106,7 +113,7 @@ async function runSearch(sb: any, query: string): Promise<string> {
         .order('created_at', { ascending: false }).limit(8)
     ),
     safe(
-      sb.from('posts').select('group_id, author_name, attachment_name, attachment_type, created_at')
+      sb.from('posts').select('group_id, author_name, attachment_name, attachment_type, attachment_url, created_at')
         .eq('deleted', false).ilike('attachment_name', pattern)
         .order('created_at', { ascending: false }).limit(8)
     ),
@@ -119,6 +126,8 @@ async function runSearch(sb: any, query: string): Promise<string> {
   ]);
 
   const lines: string[] = [];
+  const attachments: Attachment[] = [];
+  const seenUrl = new Set<string>();
   if (msgs.length) {
     lines.push('Messages:');
     msgs.forEach((m: any) =>
@@ -127,13 +136,22 @@ async function runSearch(sb: any, query: string): Promise<string> {
   }
   if (files.length) {
     lines.push('Files/images:');
-    files.forEach((f: any) =>
+    files.forEach((f: any) => {
       lines.push(
         `- "${f.attachment_name || 'file'}" (${f.attachment_type || 'file'}) shared by ${
           f.author_name || 'someone'
         } in ${gn(f.group_id)} on ${day(f.created_at)}`
-      )
-    );
+      );
+      // Collect the real attachment so the reply can show it inline.
+      if (f.attachment_url && !seenUrl.has(f.attachment_url)) {
+        seenUrl.add(f.attachment_url);
+        attachments.push({
+          url: f.attachment_url,
+          name: f.attachment_name || 'file',
+          type: f.attachment_type === 'image' ? 'image' : 'file',
+        });
+      }
+    });
   }
   if (votes.length) {
     lines.push('Votes:');
@@ -155,8 +173,8 @@ async function runSearch(sb: any, query: string): Promise<string> {
     ppl.slice(0, 10).forEach((l) => lines.push(l));
   }
 
-  if (lines.length === 0) return `No matches found for "${q}".`;
-  return lines.join('\n');
+  if (lines.length === 0) return { text: `No matches found for "${q}".`, attachments: [] };
+  return { text: lines.join('\n'), attachments };
 }
 
 // --- Providers -------------------------------------------------------------
@@ -177,8 +195,15 @@ const SEARCH_TOOL = {
   },
 };
 
-async function chatGroq(system: string, history: Msg[], sb: any): Promise<string> {
+async function chatGroq(
+  system: string,
+  history: Msg[],
+  sb: any
+): Promise<{ reply: string; attachments: Attachment[] }> {
   const messages: any[] = [{ role: 'system', content: system }, ...history];
+  const found = new Map<string, Attachment>(); // dedupe attachments surfaced by search
+  const collect = () => [...found.values()].slice(0, 6);
+
   for (let i = 0; i < 4; i++) {
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -206,28 +231,37 @@ async function chatGroq(system: string, history: Msg[], sb: any): Promise<string
         } catch {
           args = {};
         }
-        let result: string;
+        let result: SearchResult;
         try {
           result =
             tc.function?.name === 'search_rds'
               ? await runSearch(sb, args.query)
-              : `Unknown tool: ${tc.function?.name}`;
+              : { text: `Unknown tool: ${tc.function?.name}`, attachments: [] };
         } catch (err) {
           // A search failure must not kill the whole reply — tell the model.
-          result = `The search could not be completed: ${(err as Error)?.message || 'error'}`;
+          result = {
+            text: `The search could not be completed: ${(err as Error)?.message || 'error'}`,
+            attachments: [],
+          };
         }
+        result.attachments.forEach((a) => {
+          if (a.url && !found.has(a.url)) found.set(a.url, a);
+        });
         messages.push({
           role: 'tool',
           tool_call_id: tc.id,
           name: tc.function?.name,
-          content: String(result),
+          content: String(result.text),
         });
       }
       continue;
     }
-    return (msg.content || '').trim();
+    return { reply: (msg.content || '').trim(), attachments: collect() };
   }
-  return 'I looked but could not settle on an answer — could you rephrase that?';
+  return {
+    reply: 'I looked but could not settle on an answer — could you rephrase that?',
+    attachments: collect(),
+  };
 }
 
 async function chatGemini(system: string, history: Msg[]): Promise<string> {
@@ -298,14 +332,20 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    const reply = GROQ_API_KEY
-      ? await chatGroq(system, history, sb)
-      : GEMINI_API_KEY
-      ? await chatGemini(system, history)
-      : await chatClaude(system, history);
+    let reply: string;
+    let attachments: Attachment[] = [];
+    if (GROQ_API_KEY) {
+      const out = await chatGroq(system, history, sb);
+      reply = out.reply;
+      attachments = out.attachments;
+    } else if (GEMINI_API_KEY) {
+      reply = await chatGemini(system, history);
+    } else {
+      reply = await chatClaude(system, history);
+    }
 
     if (!reply) return json({ error: 'The assistant is having trouble right now — please try again in a moment.' }, 502);
-    return json({ reply });
+    return json({ reply, attachments });
   } catch (e) {
     // Friendly errors (from the AI providers) are safe to show; anything else
     // is logged and replaced with a generic message so no raw text leaks.

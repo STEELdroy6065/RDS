@@ -6,6 +6,8 @@ import {
   Pressable,
   TextInput,
   Modal,
+  Image,
+  Linking,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -134,6 +136,30 @@ async function buildContext(groups) {
   return { text: lines.join('\n'), mostActive };
 }
 
+// Renders a file/image the assistant retrieved — the same file in its original
+// group (no copy), tappable to open/download like in Feed.
+function AssistantAttachment({ att }) {
+  const open = () => att.url && Linking.openURL(att.url).catch(() => {});
+  if (att.type === 'image') {
+    return (
+      <Pressable onPress={open} style={styles.attachImageWrap}>
+        <Image source={{ uri: att.url }} style={styles.attachImage} resizeMode="cover" />
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable onPress={open} style={styles.fileCard}>
+      <View style={styles.fileIcon}>
+        <Ionicons name="document-text-outline" size={20} color={colors.inkSoft} />
+      </View>
+      <View style={styles.fileMeta}>
+        <Text style={styles.fileName} numberOfLines={1}>{att.name || 'File'}</Text>
+        <Text style={styles.fileHint}>Tap to open</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 export default function AssistantPanel({ visible, onClose }) {
   const insets = useSafeAreaInsets();
   const { user } = useSession();
@@ -216,7 +242,10 @@ export default function AssistantPanel({ visible, onClose }) {
       if (data && data.error) throw new Error(data.error);
       const reply = data && data.reply;
       if (!reply) throw new Error('The assistant returned an empty reply.');
-      setConversation((c) => [...c, { role: 'assistant', content: reply }]);
+      setConversation((c) => [
+        ...c,
+        { role: 'assistant', content: reply, attachments: (data && data.attachments) || [] },
+      ]);
     } catch (e) {
       const msg = (e && e.message) || 'Something went wrong.';
       setConversation((c) => [
@@ -282,12 +311,21 @@ export default function AssistantPanel({ visible, onClose }) {
                   style={[styles.msgRow, m.role === 'user' ? styles.msgRowUser : styles.msgRowAI]}
                 >
                   <View style={[styles.bubble, m.role === 'user' ? styles.bubbleUser : styles.bubbleAI]}>
-                    <Text
-                      selectable
-                      style={m.role === 'user' ? styles.bubbleUserText : styles.bubbleAIText}
-                    >
-                      {m.content}
-                    </Text>
+                    {m.content ? (
+                      <Text
+                        selectable
+                        style={m.role === 'user' ? styles.bubbleUserText : styles.bubbleAIText}
+                      >
+                        {m.content}
+                      </Text>
+                    ) : null}
+                    {m.attachments && m.attachments.length ? (
+                      <View style={styles.attachWrap}>
+                        {m.attachments.map((a, j) => (
+                          <AssistantAttachment key={`${a.url}-${j}`} att={a} />
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               ))
@@ -397,6 +435,41 @@ const styles = StyleSheet.create({
   },
   bubbleUserText: { ...type.body, color: colors.onPrimary, lineHeight: 21 },
   bubbleAIText: { ...type.body, color: colors.ink, lineHeight: 21 },
+
+  // assistant attachments
+  attachWrap: { marginTop: spacing.sm, gap: spacing.sm },
+  attachImageWrap: {
+    width: 180,
+    height: 180,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  attachImage: { width: '100%', height: '100%' },
+  fileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    minWidth: 180,
+  },
+  fileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileMeta: { flex: 1 },
+  fileName: { ...type.bodyStrong, fontSize: 14, color: colors.ink },
+  fileHint: { ...type.caption, fontSize: 11, color: colors.muted, marginTop: 1 },
 
   inputBar: {
     flexDirection: 'row',
