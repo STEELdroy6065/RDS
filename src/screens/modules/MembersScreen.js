@@ -21,7 +21,7 @@ export default function MembersScreen({ route, navigation }) {
   const isModerator = ['Admin', 'Captain'].includes(roleForGroup(groupId));
 
   const openRecord = (m) =>
-    navigation.navigate('Record', {
+    navigation.navigate('RecordDetail', {
       groupId,
       groupName,
       studentId: m.id,

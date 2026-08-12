@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -32,12 +32,13 @@ import GuardiansScreen from '../screens/modules/GuardiansScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
 import MediaLinksScreen from '../screens/modules/MediaLinksScreen';
 import GroupPermissionsScreen from '../screens/modules/GroupPermissionsScreen';
-import GroupRail from '../components/GroupRail';
+import { AttendHubScreen, ChatHubScreen, RecordHubScreen } from '../screens/hubs/HubScreens';
+import BottomTabBar from '../components/BottomTabBar';
 
 import { colors } from '../theme';
 import { useSession } from '../state/session';
 
-const MainStack = createNativeStackNavigator();
+const Tabs = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const navTheme = {
@@ -52,31 +53,20 @@ const navTheme = {
   },
 };
 
-// The three top-level views live in their own stack so the group rail stays
-// mounted across them. Home is the default; Alerts is reached via the bell and
-// Profile via the avatar menu (no bottom tab bar).
-function MainStackScreens() {
-  return (
-    <MainStack.Navigator
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
-    >
-      <MainStack.Screen name="Home" component={HomeScreen} />
-      <MainStack.Screen name="Alerts" component={AlertsScreen} />
-      <MainStack.Screen name="Profile" component={ProfileScreen} />
-    </MainStack.Navigator>
-  );
-}
-
-// Discord-style shell: persistent group rail on the left, the main content
-// (Home / Alerts / Profile) on the right.
+// The primary shell is a bottom tab bar — Home · Attend · Chat · Record — as in
+// the redesign. Alerts (bell) and Profile (avatar menu) are pushed over the tabs
+// from the outer stack.
 function MainShell() {
   return (
-    <View style={styles.shell}>
-      <GroupRail />
-      <View style={styles.shellContent}>
-        <MainStackScreens />
-      </View>
-    </View>
+    <Tabs.Navigator
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <BottomTabBar {...props} />}
+    >
+      <Tabs.Screen name="Home" component={HomeScreen} />
+      <Tabs.Screen name="Attend" component={AttendHubScreen} />
+      <Tabs.Screen name="Chat" component={ChatHubScreen} />
+      <Tabs.Screen name="Record" component={RecordHubScreen} />
+    </Tabs.Navigator>
   );
 }
 
@@ -95,6 +85,8 @@ export default function RootNavigator() {
         ) : session ? (
           <>
             <Stack.Screen name="Main" component={MainShell} />
+            <Stack.Screen name="Alerts" component={AlertsScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="NewGroup" component={NewGroupScreen} />
             <Stack.Screen name="ScanGroup" component={ScanGroupScreen} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
@@ -110,7 +102,7 @@ export default function RootNavigator() {
             <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Leave" component={LeaveScreen} />
-            <Stack.Screen name="Record" component={RecordScreen} />
+            <Stack.Screen name="RecordDetail" component={RecordScreen} />
             <Stack.Screen name="Week" component={WeekScreen} />
             <Stack.Screen name="Digest" component={DigestScreen} />
             <Stack.Screen name="GuardianGroup" component={GuardianGroupScreen} />
@@ -130,8 +122,3 @@ export default function RootNavigator() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  shell: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
-  shellContent: { flex: 1 },
-});

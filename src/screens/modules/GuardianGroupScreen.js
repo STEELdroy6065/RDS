@@ -94,7 +94,7 @@ export default function GuardianGroupScreen({ route, navigation }) {
                 link={l}
                 record={records[l.student_id]}
                 onOpen={() =>
-                  navigation.navigate('Record', {
+                  navigation.navigate('RecordDetail', {
                     groupId,
                     groupName,
                     studentId: l.student_id,

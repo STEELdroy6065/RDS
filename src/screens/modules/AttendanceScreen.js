@@ -216,7 +216,7 @@ export default function AttendanceScreen({ route, navigation }) {
           <TermRecordCard
             record={myRecord}
             onOpen={() =>
-              navigation.navigate('Record', {
+              navigation.navigate('RecordDetail', {
                 groupId,
                 groupName,
                 studentId: user.id,
