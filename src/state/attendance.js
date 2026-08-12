@@ -34,6 +34,62 @@ export function isPastDeadline(deadline) {
   return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= (m || 0));
 }
 
+// Four-state status metadata (Present / Late / Absent / Excused).
+export const STATUS_ORDER = ['P', 'L', 'A', 'E'];
+export const STATUS_LABEL = { P: 'Present', L: 'Late', A: 'Absent', E: 'Excused' };
+
+// Compute a single member's record across a group's submitted rolls:
+// the P/L/A/E tally, an attendance rate (excused days don't count against it),
+// and the current present-streak (most-recent consecutive P/L days; excused
+// days are skipped, an absence breaks it). Reads are RLS-scoped to members.
+export async function fetchMemberTermRecord(groupId, userId) {
+  const empty = { tally: { P: 0, L: 0, A: 0, E: 0 }, total: 0, rate: null, streak: 0 };
+  try {
+    const { data: recs } = await supabase
+      .from('attendance_records')
+      .select('id, date, status')
+      .eq('group_id', groupId)
+      .eq('status', 'submitted')
+      .order('date', { ascending: false });
+    const ids = (recs || []).map((r) => r.id);
+    if (!ids.length) return empty;
+
+    const { data: entries } = await supabase
+      .from('attendance_entries')
+      .select('record_id, status, present')
+      .eq('user_id', userId)
+      .in('record_id', ids);
+
+    const byRecord = {};
+    (entries || []).forEach((e) => {
+      byRecord[e.record_id] = e.status || (e.present ? 'P' : 'A');
+    });
+
+    // Most-recent first, only days where this member has an entry.
+    const days = (recs || [])
+      .map((r) => byRecord[r.id])
+      .filter(Boolean);
+
+    const tally = { P: 0, L: 0, A: 0, E: 0 };
+    days.forEach((s) => {
+      if (tally[s] != null) tally[s] += 1;
+    });
+    const attended = tally.P + tally.L;
+    const counted = tally.P + tally.L + tally.A; // excused excluded from the rate
+    const rate = counted > 0 ? Math.round((attended / counted) * 100) : null;
+
+    let streak = 0;
+    for (const s of days) {
+      if (s === 'P' || s === 'L') streak += 1;
+      else if (s === 'E') continue;
+      else break;
+    }
+    return { tally, total: days.length, rate, streak };
+  } catch {
+    return empty;
+  }
+}
+
 export function AttendanceProvider({ children }) {
   const { user } = useSession();
   const [recordsByGroup, setRecordsByGroup] = useState({});
@@ -76,7 +132,10 @@ export function AttendanceProvider({ children }) {
           record_id: rec.id,
           user_id: e.user_id,
           member_name: e.member_name,
-          present: e.present,
+          // Four-state status is the source of truth; `present` is kept in sync
+          // by a DB trigger (and passed here for older DBs without the trigger).
+          status: e.status || (e.present ? 'P' : 'A'),
+          present: (e.status ? e.status === 'P' || e.status === 'L' : !!e.present),
         }));
         const { error: eErr } = await supabase.from('attendance_entries').insert(rows);
         if (eErr) throw eErr;

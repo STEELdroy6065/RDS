@@ -6,7 +6,7 @@ import Screen from '../../components/Screen';
 import Card from '../../components/Card';
 import Header from '../../components/Header';
 import Pulse from '../../components/Pulse';
-import { colors, spacing, radius, type, shadow } from '../../theme';
+import { colors, spacing, radius, type, shadow, monoFamily } from '../../theme';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
@@ -15,8 +15,17 @@ import {
   canMarkAttendance,
   receivesCascade,
   isPastDeadline,
+  fetchMemberTermRecord,
+  STATUS_ORDER,
 } from '../../state/attendance';
 import { notify } from '../../lib/confirm';
+
+const STATUS_COLOR = {
+  P: colors.success,
+  L: colors.warning,
+  A: colors.accent,
+  E: colors.inkSoft,
+};
 
 const KIND_META = {
   submitted: { icon: 'checkmark-done-outline', bg: colors.surfaceAlt, fg: colors.inkSoft },
@@ -45,16 +54,20 @@ export default function AttendanceScreen({ route, navigation }) {
   const deadline = (group && group.checkInDeadline) || '09:00';
 
   const [refreshing, setRefreshing] = useState(false);
+  const [myRecord, setMyRecord] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setRefreshing(true);
       refreshGroup(groupId).finally(() => active && setRefreshing(false));
+      fetchMemberTermRecord(groupId, user.id).then((r) => {
+        if (active) setMyRecord(r);
+      });
       return () => {
         active = false;
       };
-    }, [groupId, refreshGroup])
+    }, [groupId, refreshGroup, user.id])
   );
 
   const history = historyFor(groupId);
@@ -153,6 +166,11 @@ export default function AttendanceScreen({ route, navigation }) {
           </View>
         )}
 
+        {/* Your record this term */}
+        {myRecord && myRecord.total > 0 ? (
+          <TermRecordCard record={myRecord} />
+        ) : null}
+
         {/* History (read-only, all members) */}
         <View style={styles.historyHead}>
           <Text style={styles.sectionLabel}>History</Text>
@@ -179,6 +197,42 @@ export default function AttendanceScreen({ route, navigation }) {
         )}
       </ScrollView>
     </Screen>
+  );
+}
+
+function TermRecordCard({ record }) {
+  const { tally, rate, streak, total } = record;
+  return (
+    <View style={styles.term}>
+      <View style={styles.termHead}>
+        <Text style={styles.termLabel}>YOUR RECORD THIS TERM</Text>
+        <Text style={styles.termDays}>{total} {total === 1 ? 'day' : 'days'}</Text>
+      </View>
+      <View style={styles.termTop}>
+        <View style={styles.termRate}>
+          <Text style={styles.termRateValue}>
+            {rate == null ? '—' : `${rate}`}
+            {rate == null ? '' : <Text style={styles.termRatePct}>%</Text>}
+          </Text>
+          <Text style={styles.termRateLabel}>attendance</Text>
+        </View>
+        <View style={styles.termStreak}>
+          <Ionicons name="flame" size={16} color={streak > 0 ? colors.warning : colors.muted} />
+          <Text style={styles.termStreakValue}>{streak}</Text>
+          <Text style={styles.termStreakLabel}>
+            day{streak === 1 ? '' : 's'} present in a row
+          </Text>
+        </View>
+      </View>
+      <View style={styles.termTally}>
+        {STATUS_ORDER.map((s) => (
+          <View key={s} style={styles.termChip}>
+            <View style={[styles.termDot, { backgroundColor: STATUS_COLOR[s] }]} />
+            <Text style={styles.termChipText}>{s} {tally[s]}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -449,14 +503,53 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  // term record
+  term: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    ...shadow.card,
+  },
+  termHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  termLabel: { ...type.monoLabel, fontSize: 11, letterSpacing: 1, color: colors.muted },
+  termDays: { fontFamily: monoFamily, fontSize: 12, color: colors.muted },
+  termTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
+  termRate: {},
+  termRateValue: { fontFamily: monoFamily, fontSize: 38, fontWeight: '600', color: colors.ink, letterSpacing: -1 },
+  termRatePct: { fontSize: 20, color: colors.muted },
+  termRateLabel: { ...type.monoLabel, fontSize: 10, color: colors.muted, marginTop: 2 },
+  termStreak: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
+  termStreakValue: { fontFamily: monoFamily, fontSize: 18, fontWeight: '600', color: colors.ink },
+  termStreakLabel: { ...type.caption, color: colors.muted },
+  termTally: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  termChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  termDot: { width: 7, height: 7, borderRadius: 4 },
+  termChipText: { fontFamily: monoFamily, fontSize: 12, fontWeight: '600', color: colors.inkSoft },
+
   historyHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  sectionLabel: { ...type.label, color: colors.muted },
-  sectionCount: { ...type.caption, color: colors.muted },
+  sectionLabel: { ...type.monoLabel, fontSize: 11, letterSpacing: 1, color: colors.muted },
+  sectionCount: { fontFamily: monoFamily, fontSize: 12, color: colors.muted },
 
   empty: { alignItems: 'center', paddingVertical: spacing.xl },
   emptyTitle: { ...type.heading, color: colors.ink },
@@ -484,5 +577,5 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1, marginLeft: spacing.md },
   rowTitle: { ...type.bodyStrong, fontSize: 14, color: colors.ink },
   rowSub: { ...type.caption, color: colors.muted, marginTop: 1 },
-  rowTime: { ...type.caption, color: colors.muted, marginLeft: spacing.sm },
+  rowTime: { fontFamily: monoFamily, fontSize: 12, color: colors.muted, marginLeft: spacing.sm },
 });

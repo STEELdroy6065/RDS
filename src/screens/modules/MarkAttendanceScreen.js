@@ -1,14 +1,22 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
-import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
 import Header from '../../components/Header';
-import { colors, spacing, radius, type } from '../../theme';
+import { colors, spacing, radius, type, monoFamily } from '../../theme';
 import { useGroups } from '../../state/groups';
-import { useAttendance, canMarkAttendance } from '../../state/attendance';
+import { useAttendance, canMarkAttendance, STATUS_ORDER } from '../../state/attendance';
 import { notify } from '../../lib/confirm';
+
+// Colour per status: green = present, amber = late/unresolved, red = absent,
+// neutral = excused (approved, so it doesn't read as a problem).
+const STATUS_COLOR = {
+  P: colors.success,
+  L: colors.warning,
+  A: colors.accent,
+  E: colors.inkSoft,
+};
 
 export default function MarkAttendanceScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
@@ -18,11 +26,11 @@ export default function MarkAttendanceScreen({ route, navigation }) {
   const role = roleForGroup(groupId);
   const members = membersForGroup(groupId);
 
-  // Presence map keyed by member id — everyone present by default.
-  const [present, setPresent] = useState(() => {
+  // Status map keyed by member id — everyone Present by default.
+  const [statusMap, setStatusMap] = useState(() => {
     const init = {};
     members.forEach((m) => {
-      init[m.id] = true;
+      init[m.id] = 'P';
     });
     return init;
   });
@@ -32,7 +40,7 @@ export default function MarkAttendanceScreen({ route, navigation }) {
   if (!canMarkAttendance(role)) {
     return (
       <Screen>
-        <Header title="Mark attendance" subtitle={groupName} onBack={() => navigation.goBack()} />
+        <Header title="Take the roll" subtitle={groupName} onBack={() => navigation.goBack()} />
         <View style={styles.denied}>
           <Ionicons name="lock-closed" size={28} color={colors.muted} />
           <Text style={styles.deniedText}>
@@ -43,11 +51,27 @@ export default function MarkAttendanceScreen({ route, navigation }) {
     );
   }
 
-  const presentCount = members.filter((m) => present[m.id]).length;
-  const total = members.length;
+  const tally = useMemo(() => {
+    const t = { P: 0, L: 0, A: 0, E: 0 };
+    members.forEach((m) => {
+      const s = statusMap[m.id] || 'P';
+      if (t[s] != null) t[s] += 1;
+    });
+    return t;
+  }, [members, statusMap]);
 
-  const toggle = (id, value) =>
-    setPresent((prev) => ({ ...prev, [id]: value }));
+  const total = members.length;
+  const presentCount = tally.P + tally.L; // physically there (incl. late)
+
+  const setStatus = (id, s) => setStatusMap((prev) => ({ ...prev, [id]: s }));
+
+  function markAll(s) {
+    const next = {};
+    members.forEach((m) => {
+      next[m.id] = s;
+    });
+    setStatusMap(next);
+  }
 
   async function submit() {
     if (busy) return;
@@ -55,19 +79,19 @@ export default function MarkAttendanceScreen({ route, navigation }) {
     const entries = members.map((m) => ({
       user_id: m.id,
       member_name: m.name,
-      present: !!present[m.id],
+      status: statusMap[m.id] || 'P',
     }));
     try {
       await submitAttendance(groupId, { entries, presentCount, totalCount: total });
       notify({
-        title: 'Attendance submitted',
-        message: `${presentCount} of ${total} marked present.`,
+        title: 'Roll submitted',
+        message: `${presentCount} of ${total} present.`,
         onDismiss: () => navigation.goBack(),
       });
     } catch (e) {
       setBusy(false);
       notify({
-        title: 'Could not submit attendance',
+        title: 'Could not submit the roll',
         message:
           e && /duplicate|unique/i.test(e.message || '')
             ? 'Attendance for today has already been recorded.'
@@ -78,30 +102,47 @@ export default function MarkAttendanceScreen({ route, navigation }) {
 
   return (
     <Screen>
-      <Header title="Mark attendance" subtitle={groupName} onBack={() => navigation.goBack()} />
+      <Header title="Take the roll" subtitle={groupName} onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Tally strip — mono counts, present headline */}
         <View style={styles.summary}>
           <Text style={styles.summaryValue}>
             {presentCount}<Text style={styles.summaryTotal}> / {total}</Text>
           </Text>
-          <Text style={styles.summaryLabel}>marked present</Text>
+          <Text style={styles.summaryLabel}>present</Text>
+          <View style={styles.tallyRow}>
+            {STATUS_ORDER.map((s) => (
+              <View key={s} style={styles.tallyChip}>
+                <View style={[styles.tallyDot, { backgroundColor: STATUS_COLOR[s] }]} />
+                <Text style={styles.tallyText}>{s} {tally[s]}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <Card padded={false}>
+        {/* Quick actions */}
+        <View style={styles.quickRow}>
+          <Pressable onPress={() => markAll('P')} style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}>
+            <Text style={styles.quickText}>Mark all present</Text>
+          </Pressable>
+        </View>
+
+        {/* Roster with fixed-position P/L/A/E taps */}
+        <View style={styles.list}>
           {members.map((m, i) => (
             <View key={m.id} style={[styles.row, i < members.length - 1 && styles.rowBorder]}>
-              <Avatar name={m.name} size={40} />
+              <Avatar name={m.name} size={38} />
               <View style={styles.rowBody}>
-                <Text style={styles.name}>{m.name}</Text>
+                <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
                 <Text style={styles.role}>{m.role}</Text>
               </View>
-              <Toggle value={present[m.id]} onChange={(v) => toggle(m.id, v)} />
+              <StatusPicker value={statusMap[m.id] || 'P'} onChange={(s) => setStatus(m.id, s)} />
             </View>
           ))}
-        </Card>
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -113,10 +154,7 @@ export default function MarkAttendanceScreen({ route, navigation }) {
           {busy ? (
             <ActivityIndicator color={colors.onPrimary} />
           ) : (
-            <>
-              <Ionicons name="checkmark-done" size={18} color={colors.onPrimary} />
-              <Text style={styles.ctaText}>Submit attendance</Text>
-            </>
+            <Text style={styles.ctaText}>Submit roll · {presentCount} of {total}</Text>
           )}
         </Pressable>
       </View>
@@ -124,21 +162,21 @@ export default function MarkAttendanceScreen({ route, navigation }) {
   );
 }
 
-function Toggle({ value, onChange }) {
+function StatusPicker({ value, onChange }) {
   return (
-    <View style={styles.toggle}>
-      <Pressable
-        onPress={() => onChange(true)}
-        style={[styles.segment, value && styles.segPresent]}
-      >
-        <Text style={[styles.segText, value && styles.segTextOn]}>Present</Text>
-      </Pressable>
-      <Pressable
-        onPress={() => onChange(false)}
-        style={[styles.segment, !value && styles.segAbsent]}
-      >
-        <Text style={[styles.segText, !value && styles.segTextOn]}>Absent</Text>
-      </Pressable>
+    <View style={styles.picker}>
+      {STATUS_ORDER.map((s) => {
+        const on = value === s;
+        return (
+          <Pressable
+            key={s}
+            onPress={() => onChange(s)}
+            style={[styles.cell, on && { backgroundColor: STATUS_COLOR[s] }]}
+          >
+            <Text style={[styles.cellText, on && styles.cellTextOn]}>{s}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -154,38 +192,53 @@ const styles = StyleSheet.create({
   summary: {
     alignItems: 'center',
     paddingVertical: spacing.lg,
-    marginBottom: spacing.md,
   },
-  summaryValue: { ...type.display, fontSize: 34, color: colors.ink },
+  summaryValue: { fontFamily: monoFamily, fontSize: 38, fontWeight: '600', color: colors.ink, letterSpacing: -1 },
   summaryTotal: { color: colors.muted },
-  summaryLabel: { ...type.caption, color: colors.muted, marginTop: 2 },
+  summaryLabel: { ...type.monoLabel, color: colors.muted, marginTop: 2 },
+  tallyRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+  tallyChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tallyDot: { width: 7, height: 7, borderRadius: 4 },
+  tallyText: { fontFamily: monoFamily, fontSize: 12, fontWeight: '600', color: colors.inkSoft },
 
+  quickRow: { flexDirection: 'row', marginBottom: spacing.md },
+  quickBtn: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  quickText: { ...type.caption, fontWeight: '700', color: colors.success },
+
+  list: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
-  rowBody: { flex: 1, marginLeft: spacing.md },
+  rowBody: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
   name: { ...type.bodyStrong, color: colors.ink },
   role: { ...type.caption, color: colors.muted, marginTop: 1 },
 
-  toggle: {
-    flexDirection: 'row',
+  picker: { flexDirection: 'row', gap: 5 },
+  cell: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.pill,
-    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  segment: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  segPresent: { backgroundColor: colors.success },
-  segAbsent: { backgroundColor: colors.accent },
-  segText: { ...type.caption, fontWeight: '700', color: colors.muted },
-  segTextOn: { color: colors.onPrimary },
+  cellText: { fontFamily: monoFamily, fontSize: 13, fontWeight: '600', color: colors.muted },
+  cellTextOn: { color: colors.onPrimary },
 
   footer: {
     paddingHorizontal: spacing.lg,
