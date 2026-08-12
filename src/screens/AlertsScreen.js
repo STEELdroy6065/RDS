@@ -14,6 +14,8 @@ const TYPE_META = {
   new_announcement: { icon: 'megaphone-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Announcement' },
   attendance_missed: { icon: 'alert-circle-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Attendance' },
   post_reported: { icon: 'flag-outline', bg: colors.accentSoft, fg: colors.accent, label: 'Report' },
+  leave_requested: { icon: 'calendar-outline', bg: colors.warningSoft, fg: colors.warning, label: 'Leave' },
+  leave_decided: { icon: 'checkmark-circle-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Leave' },
 };
 
 function relTime(iso) {
@@ -84,6 +86,10 @@ export default function AlertsScreen({ navigation }) {
         break;
       case 'post_reported':
         navigation.navigate('ReportedPosts', { groupId: n.group_id, groupName });
+        break;
+      case 'leave_requested':
+      case 'leave_decided':
+        navigation.navigate('Leave', { groupId: n.group_id, groupName });
         break;
       default:
         break;

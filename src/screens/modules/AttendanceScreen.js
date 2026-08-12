@@ -18,6 +18,7 @@ import {
   fetchMemberTermRecord,
   STATUS_ORDER,
 } from '../../state/attendance';
+import { fetchLeave } from '../../lib/leave';
 import { notify } from '../../lib/confirm';
 
 const STATUS_COLOR = {
@@ -55,6 +56,7 @@ export default function AttendanceScreen({ route, navigation }) {
 
   const [refreshing, setRefreshing] = useState(false);
   const [myRecord, setMyRecord] = useState(null);
+  const [pendingLeave, setPendingLeave] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,6 +65,9 @@ export default function AttendanceScreen({ route, navigation }) {
       refreshGroup(groupId).finally(() => active && setRefreshing(false));
       fetchMemberTermRecord(groupId, user.id).then((r) => {
         if (active) setMyRecord(r);
+      });
+      fetchLeave(groupId).then((rows) => {
+        if (active) setPendingLeave(rows.filter((r) => r.status === 'pending').length);
       });
       return () => {
         active = false;
@@ -165,6 +170,29 @@ export default function AttendanceScreen({ route, navigation }) {
             </Text>
           </View>
         )}
+
+        {/* Leave requests entry point */}
+        <Pressable
+          onPress={() => navigation.navigate('Leave', { groupId, groupName })}
+          style={({ pressed }) => [styles.leaveRow, pressed && styles.pressed]}
+        >
+          <View style={styles.leaveIcon}>
+            <Ionicons name="calendar-outline" size={19} color={colors.inkSoft} />
+          </View>
+          <View style={styles.leaveBody}>
+            <Text style={styles.leaveTitle}>Leave requests</Text>
+            <Text style={styles.leaveSub}>
+              {isAdmin || isCaptain ? 'Review and decide leave' : 'Request time off'}
+            </Text>
+          </View>
+          {(isAdmin || isCaptain) && pendingLeave > 0 ? (
+            <View style={styles.leaveBadge}>
+              <Text style={styles.leaveBadgeText}>{pendingLeave}</Text>
+            </View>
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          )}
+        </Pressable>
 
         {/* Your record this term */}
         {myRecord && myRecord.total > 0 ? (
@@ -502,6 +530,39 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
+
+  // leave entry
+  leaveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  leaveIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveBody: { flex: 1, marginLeft: spacing.md },
+  leaveTitle: { ...type.bodyStrong, color: colors.ink },
+  leaveSub: { ...type.caption, color: colors.muted, marginTop: 1 },
+  leaveBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: colors.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveBadgeText: { fontFamily: monoFamily, fontSize: 12, fontWeight: '700', color: colors.onPrimary },
 
   // term record
   term: {

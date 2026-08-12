@@ -22,6 +22,7 @@ import NewVoteScreen from '../screens/modules/NewVoteScreen';
 import MembersScreen from '../screens/modules/MembersScreen';
 import AttendanceScreen from '../screens/modules/AttendanceScreen';
 import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
+import LeaveScreen from '../screens/modules/LeaveScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
 import MediaLinksScreen from '../screens/modules/MediaLinksScreen';
 import GroupPermissionsScreen from '../screens/modules/GroupPermissionsScreen';
@@ -101,6 +102,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Members" component={MembersScreen} />
             <Stack.Screen name="Attendance" component={AttendanceScreen} />
             <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
+            <Stack.Screen name="Leave" component={LeaveScreen} />
             <Stack.Screen name="PrivacyNotice" component={PrivacyScreen} />
           </>
         ) : (

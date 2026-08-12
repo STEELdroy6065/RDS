@@ -17,7 +17,7 @@ const NotificationsContext = createContext(null);
 
 // "Needs you" = has a real deadline/action attached. Only these badge the bell.
 // Everything else (announcements, joins) is informational.
-const ACTIONABLE_TYPES = new Set(['new_vote', 'attendance_missed', 'post_reported']);
+const ACTIONABLE_TYPES = new Set(['new_vote', 'attendance_missed', 'post_reported', 'leave_requested']);
 export function isActionable(type) {
   return ACTIONABLE_TYPES.has(type);
 }

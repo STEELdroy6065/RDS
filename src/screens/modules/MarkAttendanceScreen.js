@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
@@ -6,7 +6,8 @@ import Avatar from '../../components/Avatar';
 import Header from '../../components/Header';
 import { colors, spacing, radius, type, monoFamily } from '../../theme';
 import { useGroups } from '../../state/groups';
-import { useAttendance, canMarkAttendance, STATUS_ORDER } from '../../state/attendance';
+import { useAttendance, canMarkAttendance, STATUS_ORDER, localDateStr } from '../../state/attendance';
+import { fetchLeaveForDate } from '../../lib/leave';
 import { notify } from '../../lib/confirm';
 
 // Colour per status: green = present, amber = late/unresolved, red = absent,
@@ -35,6 +36,30 @@ export default function MarkAttendanceScreen({ route, navigation }) {
     return init;
   });
   const [busy, setBusy] = useState(false);
+  // Leave requests for today, keyed by member id — approved leave pre-marks the
+  // member Excused; pending leave surfaces inline so the teacher sees it.
+  const [leaveMap, setLeaveMap] = useState({});
+
+  useEffect(() => {
+    let active = true;
+    fetchLeaveForDate(groupId, localDateStr()).then((map) => {
+      if (!active) return;
+      setLeaveMap(map);
+      const approved = Object.keys(map).filter((id) => map[id].status === 'approved');
+      if (approved.length) {
+        setStatusMap((prev) => {
+          const next = { ...prev };
+          approved.forEach((id) => {
+            next[id] = 'E';
+          });
+          return next;
+        });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [groupId]);
 
   // Defensive guard: only Admin/Teacher can reach this.
   if (!canMarkAttendance(role)) {
@@ -137,7 +162,14 @@ export default function MarkAttendanceScreen({ route, navigation }) {
               <Avatar name={m.name} size={38} />
               <View style={styles.rowBody}>
                 <Text style={styles.name} numberOfLines={1}>{m.name}</Text>
-                <Text style={styles.role}>{m.role}</Text>
+                {leaveMap[m.id] ? (
+                  <Text style={styles.leaveNote} numberOfLines={1}>
+                    {leaveMap[m.id].status === 'approved' ? 'Leave approved' : 'Leave requested'}
+                    {leaveMap[m.id].reason ? ` — ${leaveMap[m.id].reason}` : ''}
+                  </Text>
+                ) : (
+                  <Text style={styles.role}>{m.role}</Text>
+                )}
               </View>
               <StatusPicker value={statusMap[m.id] || 'P'} onChange={(s) => setStatus(m.id, s)} />
             </View>
@@ -227,6 +259,7 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
   name: { ...type.bodyStrong, color: colors.ink },
   role: { ...type.caption, color: colors.muted, marginTop: 1 },
+  leaveNote: { ...type.caption, color: colors.warning, fontWeight: '600', marginTop: 1 },
 
   picker: { flexDirection: 'row', gap: 5 },
   cell: {
