@@ -12,6 +12,7 @@ import PrivacyScreen from '../screens/PrivacyScreen';
 import HomeScreen from '../screens/HomeScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import NewGroupScreen from '../screens/NewGroupScreen';
 import ScanGroupScreen from '../screens/ScanGroupScreen';
@@ -104,6 +105,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Members" component={MembersScreen} />
             <Stack.Screen name="Attendance" component={AttendanceScreen} />
             <Stack.Screen name="MarkAttendance" component={MarkAttendanceScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Leave" component={LeaveScreen} />
             <Stack.Screen name="GuardianGroup" component={GuardianGroupScreen} />
             <Stack.Screen name="Guardians" component={GuardiansScreen} />

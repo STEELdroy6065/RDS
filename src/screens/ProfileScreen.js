@@ -71,14 +71,17 @@ export default function ProfileScreen({ navigation }) {
           <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.back}>
             <Ionicons name="chevron-back" size={24} color={colors.onPrimary} />
           </Pressable>
-          <View style={styles.headerRow}>
-            <Avatar name={name} size={64} color="#3F4048" />
+          <Pressable style={styles.headerRow} onPress={() => navigation.navigate('EditProfile')}>
+            <Avatar name={name} uri={user ? user.avatarUrl : null} size={64} color="#3F4048" />
             <View style={styles.headerText}>
               <Text style={styles.headerName} numberOfLines={1}>{name}</Text>
               {email ? <Text style={styles.headerSub} numberOfLines={1}>{email}</Text> : null}
               <Text style={styles.headerRole}>{myTopRole}</Text>
             </View>
-          </View>
+            <View style={styles.editChip}>
+              <Ionicons name="pencil" size={14} color={colors.onPrimary} />
+            </View>
+          </Pressable>
         </View>
 
         {/* Compact stats strip */}
@@ -148,6 +151,14 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   headerText: { flex: 1 },
+  editChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerName: { ...type.title, color: colors.onPrimary },
   headerSub: { ...type.caption, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
   headerRole: {

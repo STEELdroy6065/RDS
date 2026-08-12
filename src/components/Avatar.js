@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors, colorFromString, radius, type } from '../theme';
 
 function initials(name = '') {
@@ -11,11 +11,16 @@ function initials(name = '') {
     .join('');
 }
 
-// Colored circular initials avatar. Pass `emoji` for a glyph tile, `color` to
-// force the circle color (e.g. by role), or `ring` to draw a colored ring.
-export default function Avatar({ name, emoji, size = 44, ring, color }) {
+// Circular avatar. Pass `uri` for a profile photo, `emoji` for a glyph tile,
+// `color` to force the circle color (e.g. by role), or `ring` to draw a ring.
+export default function Avatar({ name, emoji, uri, size = 44, ring, color }) {
   const bg = color || colorFromString(name || emoji || '');
-  const avatar = (
+  const avatar = uri ? (
+    <Image
+      source={{ uri }}
+      style={[styles.photo, { width: size, height: size, borderRadius: size / 2 }]}
+    />
+  ) : (
     <View
       style={[
         styles.wrap,
@@ -65,5 +70,8 @@ const styles = StyleSheet.create({
   text: {
     ...type.bodyStrong,
     color: '#FFFFFF',
+  },
+  photo: {
+    backgroundColor: colors.surfaceAlt,
   },
 });

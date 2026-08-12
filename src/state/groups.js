@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import { useSession } from './session';
+import { fetchProfiles } from '../lib/profiles';
 import { groupTemplates } from '../data/discoverable';
 
 // Real groups & memberships, backed by Supabase. The provider loads the groups
@@ -86,15 +87,23 @@ export function GroupsProvider({ children }) {
       all = data || [];
     }
 
+    // Real names/avatars for everyone in these groups (RLS scopes what we can
+    // see; anyone we can't resolve keeps a neutral placeholder).
+    const profiles = await fetchProfiles(all.map((m) => m.user_id));
+
     const counts = {};
     const rosterByGroup = {};
     all.forEach((m) => {
       counts[m.group_id] = (counts[m.group_id] || 0) + 1;
       if (!rosterByGroup[m.group_id]) rosterByGroup[m.group_id] = [];
+      const prof = profiles[m.user_id];
+      const name =
+        (prof && prof.name) ||
+        (m.user_id === user.id ? user.name : 'Group member');
       rosterByGroup[m.group_id].push({
         id: m.user_id,
-        // No profiles table yet, so we can only name ourselves.
-        name: m.user_id === user.id ? user.name : 'Group member',
+        name,
+        avatarUrl: (prof && prof.avatarUrl) || null,
         role: m.role,
       });
     });

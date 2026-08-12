@@ -183,7 +183,7 @@ function MemberPicker({ members, selected, onSelect, label }) {
             onPress={() => onSelect(on ? null : m.id)}
             style={[styles.pickChip, on && styles.pickChipOn]}
           >
-            <Avatar name={m.name} size={26} />
+            <Avatar name={m.name} uri={m.avatarUrl} size={26} />
             <Text style={[styles.pickChipText, on && styles.pickChipTextOn]} numberOfLines={1}>
               {label(m)}
             </Text>

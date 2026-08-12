@@ -156,7 +156,7 @@ export default function HomeScreen({ navigation }) {
             hitSlop={8}
             style={({ pressed }) => pressed && styles.pressed}
           >
-            <Avatar name={firstName} size={34} color={HEADER_AVATAR_COLOR} />
+            <Avatar name={firstName} uri={user ? user.avatarUrl : null} size={34} color={HEADER_AVATAR_COLOR} />
           </Pressable>
         </View>
       </View>

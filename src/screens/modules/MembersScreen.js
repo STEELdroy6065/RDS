@@ -36,7 +36,7 @@ export default function MembersScreen({ route, navigation }) {
               key={m.id}
               style={[styles.row, i < members.length - 1 && styles.rowBorder]}
             >
-              <Avatar name={m.name} size={40} ring={ring} />
+              <Avatar name={m.name} uri={m.avatarUrl} size={40} ring={ring} />
               <Text style={styles.name} numberOfLines={1}>
                 {m.name}
               </Text>
