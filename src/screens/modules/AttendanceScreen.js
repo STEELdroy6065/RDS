@@ -196,7 +196,17 @@ export default function AttendanceScreen({ route, navigation }) {
 
         {/* Your record this term */}
         {myRecord && myRecord.total > 0 ? (
-          <TermRecordCard record={myRecord} />
+          <TermRecordCard
+            record={myRecord}
+            onOpen={() =>
+              navigation.navigate('Record', {
+                groupId,
+                groupName,
+                studentId: user.id,
+                studentName: user.name,
+              })
+            }
+          />
         ) : null}
 
         {/* History (read-only, all members) */}
@@ -228,7 +238,7 @@ export default function AttendanceScreen({ route, navigation }) {
   );
 }
 
-function TermRecordCard({ record }) {
+function TermRecordCard({ record, onOpen }) {
   const { tally, rate, streak, total } = record;
   return (
     <View style={styles.term}>
@@ -260,6 +270,12 @@ function TermRecordCard({ record }) {
           </View>
         ))}
       </View>
+      {onOpen ? (
+        <Pressable onPress={onOpen} style={({ pressed }) => [styles.termCta, pressed && styles.pressed]}>
+          <Text style={styles.termCtaText}>See my full record</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.ink} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -602,6 +618,17 @@ const styles = StyleSheet.create({
   termChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   termDot: { width: 7, height: 7, borderRadius: 4 },
   termChipText: { fontFamily: monoFamily, fontSize: 12, fontWeight: '600', color: colors.inkSoft },
+  termCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  termCtaText: { ...type.bodyStrong, fontSize: 14, color: colors.ink },
 
   historyHead: {
     flexDirection: 'row',

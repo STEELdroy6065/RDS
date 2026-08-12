@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
@@ -89,7 +89,19 @@ export default function GuardianGroupScreen({ route, navigation }) {
         ) : (
           <>
             {links.map((l) => (
-              <StudentCard key={l.id} link={l} record={records[l.student_id]} />
+              <StudentCard
+                key={l.id}
+                link={l}
+                record={records[l.student_id]}
+                onOpen={() =>
+                  navigation.navigate('Record', {
+                    groupId,
+                    groupName,
+                    studentId: l.student_id,
+                    studentName: l.student_name,
+                  })
+                }
+              />
             ))}
 
             <Text style={styles.section}>ANNOUNCEMENTS</Text>
@@ -129,10 +141,10 @@ export default function GuardianGroupScreen({ route, navigation }) {
   );
 }
 
-function StudentCard({ link, record }) {
+function StudentCard({ link, record, onOpen }) {
   const r = record || { tally: { P: 0, L: 0, A: 0, E: 0 }, total: 0, rate: null, streak: 0 };
   return (
-    <View style={styles.card}>
+    <Pressable onPress={onOpen} style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}>
       <View style={styles.studentHead}>
         <Avatar name={link.student_name || 'Student'} size={40} />
         <View style={styles.studentWho}>
@@ -164,7 +176,12 @@ function StudentCard({ link, record }) {
           </View>
         ))}
       </View>
-    </View>
+
+      <View style={styles.studentCta}>
+        <Text style={styles.studentCtaText}>See full record</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.ink} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -216,6 +233,17 @@ const styles = StyleSheet.create({
   termChip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   termDot: { width: 7, height: 7, borderRadius: 4 },
   termChipText: { fontFamily: monoFamily, fontSize: 12, fontWeight: '600', color: colors.inkSoft },
+  studentCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  studentCtaText: { ...type.bodyStrong, fontSize: 14, color: colors.ink },
 
   annRow: {
     flexDirection: 'row',

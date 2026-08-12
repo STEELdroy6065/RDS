@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Avatar from '../../components/Avatar';
 import RoleBadge from '../../components/RoleBadge';
@@ -14,8 +15,18 @@ const APP_ROLES = ['Admin', 'Captain', 'Member'];
 
 export default function MembersScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
-  const { membersForGroup } = useGroups();
+  const { membersForGroup, roleForGroup } = useGroups();
   const members = membersForGroup(groupId);
+  // Moderators can open a member's record (to view or verify it).
+  const isModerator = ['Admin', 'Captain'].includes(roleForGroup(groupId));
+
+  const openRecord = (m) =>
+    navigation.navigate('Record', {
+      groupId,
+      groupName,
+      studentId: m.id,
+      studentName: m.name,
+    });
 
   return (
     <Screen>
@@ -31,10 +42,17 @@ export default function MembersScreen({ route, navigation }) {
         {members.map((m, i) => {
           const isAppRole = APP_ROLES.includes(m.role);
           const ring = isAppRole ? roleTheme(m.role).ring : undefined;
+          // Records are for students (participants), not guardians.
+          const canOpen = isModerator && m.role !== 'Guardian';
           return (
-            <View
+            <Pressable
               key={m.id}
-              style={[styles.row, i < members.length - 1 && styles.rowBorder]}
+              onPress={canOpen ? () => openRecord(m) : undefined}
+              style={({ pressed }) => [
+                styles.row,
+                i < members.length - 1 && styles.rowBorder,
+                canOpen && pressed && styles.rowPressed,
+              ]}
             >
               <Avatar name={m.name} uri={m.avatarUrl} size={40} ring={ring} />
               <Text style={styles.name} numberOfLines={1}>
@@ -45,7 +63,10 @@ export default function MembersScreen({ route, navigation }) {
               ) : (
                 <Badge label={m.role} tone="neutral" />
               )}
-            </View>
+              {canOpen ? (
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} style={styles.chev} />
+              ) : null}
+            </Pressable>
           );
         })}
       </ScrollView>
@@ -72,6 +93,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
   },
+  rowPressed: { backgroundColor: colors.surfaceAlt },
+  chev: { marginLeft: spacing.sm },
   name: {
     ...type.bodyStrong,
     color: colors.ink,
