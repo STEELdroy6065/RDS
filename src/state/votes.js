@@ -39,12 +39,14 @@ function buildVote(row, options, ballots, total) {
     question: row.question,
     visibility: row.visibility,
     status: row.status,
+    kind: row.kind || 'poll',
+    termEnds: row.term_ends || null,
     createdBy: row.created_by,
     createdByName: row.creator_name || 'Someone',
     createdAt: relTime(row.created_at),
     options: [...options]
       .sort((a, b) => a.position - b.position)
-      .map((o) => ({ id: o.id, label: o.label })),
+      .map((o) => ({ id: o.id, label: o.label, candidateId: o.candidate_id || null })),
     ballots: ballotMap,
     total: typeof total === 'number' ? total : Object.keys(ballotMap).length,
   };
@@ -58,7 +60,7 @@ export function VotesProvider({ children }) {
   const refreshGroup = useCallback(async (groupId) => {
     const { data: rows, error } = await supabase
       .from('votes')
-      .select('id, group_id, question, visibility, status, created_by, creator_name, created_at')
+      .select('id, group_id, question, visibility, status, kind, term_ends, created_by, creator_name, created_at')
       .eq('group_id', groupId)
       .order('created_at', { ascending: false });
     if (error) return;
@@ -69,7 +71,7 @@ export function VotesProvider({ children }) {
     let counts = [];
     if (ids.length) {
       const [optRes, balRes, cntRes] = await Promise.all([
-        supabase.from('vote_options').select('id, vote_id, label, position').in('vote_id', ids),
+        supabase.from('vote_options').select('id, vote_id, label, position, candidate_id').in('vote_id', ids),
         supabase.from('vote_ballots').select('vote_id, option_id, user_id, voter_name').in('vote_id', ids),
         supabase.rpc('vote_counts', { gid: groupId }),
       ]);
@@ -101,7 +103,7 @@ export function VotesProvider({ children }) {
   const refreshVote = useCallback(async (voteId) => {
     const { data: row, error } = await supabase
       .from('votes')
-      .select('id, group_id, question, visibility, status, created_by, creator_name, created_at')
+      .select('id, group_id, question, visibility, status, kind, term_ends, created_by, creator_name, created_at')
       .eq('id', voteId)
       .maybeSingle();
     if (error || !row) {
@@ -114,7 +116,7 @@ export function VotesProvider({ children }) {
     }
 
     const [optRes, balRes, cntRes] = await Promise.all([
-      supabase.from('vote_options').select('id, vote_id, label, position').eq('vote_id', voteId),
+      supabase.from('vote_options').select('id, vote_id, label, position, candidate_id').eq('vote_id', voteId),
       supabase.from('vote_ballots').select('vote_id, option_id, user_id, voter_name').eq('vote_id', voteId),
       supabase.rpc('vote_participation', { vid: voteId }),
     ]);
@@ -128,14 +130,18 @@ export function VotesProvider({ children }) {
     setVotesById((prev) => ({ ...prev, [voteId]: built }));
   }, []);
 
+  // Options may be plain label strings (a poll) or { label, candidateId }
+  // objects (a captain election). Elections also carry kind + termEnds.
   const createVote = useCallback(
-    async ({ groupId, question, options, visibility, creator }) => {
+    async ({ groupId, question, options, visibility, creator, kind = 'poll', termEnds = null }) => {
       const { data: vote, error } = await supabase
         .from('votes')
         .insert({
           group_id: groupId,
           question: question.trim(),
           visibility,
+          kind,
+          term_ends: termEnds,
           created_by: creator.id,
           creator_name: creator.name,
         })
@@ -144,7 +150,11 @@ export function VotesProvider({ children }) {
       if (error) throw error;
 
       const rows = options
-        .map((label, i) => ({ vote_id: vote.id, label: label.trim(), position: i }))
+        .map((o, i) => {
+          const label = (typeof o === 'string' ? o : o.label || '').trim();
+          const candidateId = typeof o === 'string' ? null : o.candidateId || null;
+          return { vote_id: vote.id, label, position: i, candidate_id: candidateId };
+        })
         .filter((r) => r.label);
       const { error: oErr } = await supabase.from('vote_options').insert(rows);
       if (oErr) throw oErr;
@@ -153,6 +163,18 @@ export function VotesProvider({ children }) {
       return vote.id;
     },
     [refreshGroup]
+  );
+
+  // Close a captain election: transfers the role to the winner (server-side).
+  // Returns the winner's user id.
+  const closeElection = useCallback(
+    async (voteId) => {
+      const { data, error } = await supabase.rpc('close_election', { vid: voteId });
+      if (error) throw error;
+      await refreshVote(voteId);
+      return data;
+    },
+    [refreshVote]
   );
 
   const castVote = useCallback(
@@ -213,9 +235,10 @@ export function VotesProvider({ children }) {
       createVote,
       castVote,
       closeVote,
+      closeElection,
       deleteVote,
     }),
-    [votesById, voteIdsByGroup, refreshGroup, refreshVote, createVote, castVote, closeVote, deleteVote]
+    [votesById, voteIdsByGroup, refreshGroup, refreshVote, createVote, castVote, closeVote, closeElection, deleteVote]
   );
 
   return <VotesContext.Provider value={value}>{children}</VotesContext.Provider>;

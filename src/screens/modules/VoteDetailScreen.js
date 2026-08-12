@@ -28,8 +28,8 @@ import {
 export default function VoteDetailScreen({ route, navigation }) {
   const { voteId, groupName } = route.params;
   const { user } = useSession();
-  const { roleForGroup } = useGroups();
-  const { getVote, refreshVote, castVote, closeVote, deleteVote } = useVotes();
+  const { roleForGroup, refresh: refreshGroups } = useGroups();
+  const { getVote, refreshVote, castVote, closeVote, closeElection, deleteVote } = useVotes();
 
   const [loaded, setLoaded] = useState(false);
 
@@ -74,6 +74,15 @@ export default function VoteDetailScreen({ route, navigation }) {
   const mayDelete = creator || canCreateVote(roleForGroup(vote.groupId));
   const total = totalVotes(vote);
   const label = statusLabel(vote);
+  const isElection = vote.kind === 'captain_election';
+
+  // The leading / winning candidate (by ballots; ties → first option).
+  const winner = isElection
+    ? vote.options.reduce((best, o) => {
+        const c = countForOption(vote, o.id);
+        return !best || c > best.count ? { option: o, count: c } : best;
+      }, null)
+    : null;
 
   function onDelete() {
     confirm({
@@ -93,6 +102,25 @@ export default function VoteDetailScreen({ route, navigation }) {
   }
 
   function onClose() {
+    if (isElection) {
+      const lead = winner && winner.option ? winner.option.label : 'the leading candidate';
+      confirm({
+        title: 'Close & hand over?',
+        message: `${lead} will become Captain and any current Captain steps down. This transfers the role now and can’t be undone.`,
+        confirmLabel: 'Close & hand over',
+        destructive: true,
+        onConfirm: async () => {
+          try {
+            await closeElection(vote.id);
+            await refreshGroups(); // reflect the role change app-wide
+            notify({ title: 'Handover complete', message: `${lead} is the new Captain.` });
+          } catch (e) {
+            notify({ title: 'Could not close the election', message: e && e.message });
+          }
+        },
+      });
+      return;
+    }
     confirm({
       title: 'Close this vote?',
       message:
@@ -128,6 +156,11 @@ export default function VoteDetailScreen({ route, navigation }) {
               {creator ? 'You' : vote.createdByName} · {vote.createdAt}
             </Text>
           </View>
+
+          {/* Election context: candidacy + term (open) or the handover (closed) */}
+          {isElection ? (
+            <ElectionBanner vote={vote} open={open} winner={winner} seeResults={seeResults} />
+          ) : null}
 
           {/* Concealed banner (open + hidden + not creator) */}
           {!seeResults ? (
@@ -177,8 +210,8 @@ export default function VoteDetailScreen({ route, navigation }) {
             onPress={onClose}
             style={({ pressed }) => [styles.closeBtn, pressed && styles.closePressed]}
           >
-            <Ionicons name="lock-closed" size={18} color={colors.ink} />
-            <Text style={styles.closeText}>Close vote</Text>
+            <Ionicons name={isElection ? 'ribbon' : 'lock-closed'} size={18} color={colors.ink} />
+            <Text style={styles.closeText}>{isElection ? 'Close & hand over' : 'Close vote'}</Text>
           </Pressable>
         ) : null}
 
@@ -231,6 +264,49 @@ function StatusRow({ label, total, seeResults }) {
           ? `${total} ${total === 1 ? 'vote' : 'votes'}`
           : `${total} voted`}
       </Text>
+    </View>
+  );
+}
+
+function fmtTermDate(iso) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+  const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${MO[(m || 1) - 1]} ${d}, ${y}`;
+}
+
+function ElectionBanner({ vote, open, winner, seeResults }) {
+  const term = fmtTermDate(vote.termEnds);
+  if (open) {
+    return (
+      <View style={styles.electionBanner}>
+        <View style={styles.electionIcon}>
+          <Ionicons name="ribbon" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.hiddenBody}>
+          <Text style={styles.hiddenTitle}>Captain election</Text>
+          <Text style={styles.hiddenSub}>
+            The winner becomes Captain when this closes.
+            {term ? ` Term runs to ${term}.` : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  // Closed → announce the new Captain.
+  const name = winner && winner.option ? winner.option.label : 'The winner';
+  return (
+    <View style={styles.handoverBanner}>
+      <View style={styles.handoverIcon}>
+        <Ionicons name="ribbon" size={20} color={colors.onPrimary} />
+      </View>
+      <View style={styles.hiddenBody}>
+        <Text style={styles.handoverTitle}>{name} is the Captain</Text>
+        <Text style={styles.handoverSub}>
+          {seeResults ? `Elected with ${winner ? winner.count : 0} ${winner && winner.count === 1 ? 'vote' : 'votes'}. ` : ''}
+          {term ? `Term runs to ${term}.` : 'Role transferred.'}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -291,12 +367,16 @@ function OptionRow({
 
       <View style={styles.optionRow}>
         <View style={styles.optionLeft}>
-          <View style={[styles.radio, selected && styles.radioOn]}>
-            {selected ? (
-              <Ionicons name="checkmark" size={13} color={colors.onPrimary} />
-            ) : null}
-          </View>
-          <Text style={[styles.optionLabel, selected && styles.optionLabelOn]}>
+          {option.candidateId ? (
+            <Avatar name={option.label} size={26} />
+          ) : (
+            <View style={[styles.radio, selected && styles.radioOn]}>
+              {selected ? (
+                <Ionicons name="checkmark" size={13} color={colors.onPrimary} />
+              ) : null}
+            </View>
+          )}
+          <Text style={[styles.optionLabel, selected && styles.optionLabelOn, { marginLeft: spacing.md }]}>
             {option.label}
           </Text>
         </View>
@@ -400,6 +480,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  electionBanner: {
+    flexDirection: 'row',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  electionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  handoverBanner: {
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  handoverIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  handoverTitle: { ...type.bodyStrong, color: colors.onPrimary },
+  handoverSub: { ...type.caption, color: 'rgba(255,255,255,0.8)', marginTop: 3, lineHeight: 18 },
   hiddenBody: { flex: 1, marginLeft: spacing.md },
   hiddenTitle: { ...type.bodyStrong, color: colors.ink },
   hiddenSub: {
@@ -441,7 +553,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
     backgroundColor: colors.surface,
   },
   radioOn: { backgroundColor: colors.primary, borderColor: colors.primary },

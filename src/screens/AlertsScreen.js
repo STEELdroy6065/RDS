@@ -16,6 +16,7 @@ const TYPE_META = {
   post_reported: { icon: 'flag-outline', bg: colors.accentSoft, fg: colors.accent, label: 'Report' },
   leave_requested: { icon: 'calendar-outline', bg: colors.warningSoft, fg: colors.warning, label: 'Leave' },
   leave_decided: { icon: 'checkmark-circle-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Leave' },
+  captain_elected: { icon: 'ribbon-outline', bg: colors.surfaceAlt, fg: colors.inkSoft, label: 'Election' },
 };
 
 function relTime(iso) {
@@ -93,6 +94,10 @@ export default function AlertsScreen({ navigation }) {
       case 'leave_requested':
       case 'leave_decided':
         navigation.navigate('Leave', { groupId: n.group_id, groupName });
+        break;
+      case 'captain_elected':
+        if (n.entity_id) navigation.navigate('VoteDetail', { voteId: n.entity_id, groupName });
+        else navigation.navigate('Votes', { groupId: n.group_id, groupName });
         break;
       default:
         break;
