@@ -21,9 +21,15 @@ export const roleColors = {
     text: '#57534C',
     ring: '#DAD5CC',
   },
+  Guardian: {
+    solid: '#3C6CA6',
+    soft: '#EBF1F8',
+    text: '#2F5580',
+    ring: '#BCD0E6',
+  },
 };
 
-const RANK = { Admin: 3, Captain: 2, Member: 1 };
+const RANK = { Admin: 3, Captain: 2, Member: 1, Guardian: 0 };
 
 export function roleTheme(role) {
   return roleColors[role] || roleColors.Member;

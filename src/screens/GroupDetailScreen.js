@@ -236,6 +236,17 @@ export default function GroupDetailScreen({ route, navigation }) {
           />
         ) : null}
 
+        {isAdmin ? (
+          <InfoRow
+            icon="people-circle-outline"
+            title="Guardians"
+            subtitle="Link a parent/guardian to a student"
+            onPress={() =>
+              navigation.navigate('Guardians', { groupId: group.id, groupName: group.name })
+            }
+          />
+        ) : null}
+
         <Pressable
           onPress={onLeave}
           style={({ pressed }) => [styles.actionRow, pressed && styles.actionPressed]}

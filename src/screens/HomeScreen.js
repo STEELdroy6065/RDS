@@ -122,6 +122,13 @@ export default function HomeScreen({ navigation }) {
 
   const searching = q.length > 0;
 
+  // Guardians get a read-only group view; everyone else opens the Feed.
+  const openGroup = (g) =>
+    navigation.navigate(g.role === 'Guardian' ? 'GuardianGroup' : 'Feed', {
+      groupId: g.id,
+      groupName: g.name,
+    });
+
   return (
     <Screen>
       {/* Top bar */}
@@ -201,7 +208,7 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {searching ? (
-          <SearchResults query={q} results={results} navigation={navigation} />
+          <SearchResults query={q} results={results} navigation={navigation} onOpenGroup={openGroup} />
         ) : (
           <>
             <SectionLabel style={styles.section}>Your groups</SectionLabel>
@@ -218,7 +225,7 @@ export default function HomeScreen({ navigation }) {
                   key={g.id}
                   group={g}
                   status={statusByGroup[g.id] && statusByGroup[g.id].text}
-                  onPress={() => navigation.navigate('Feed', { groupId: g.id, groupName: g.name })}
+                  onPress={() => openGroup(g)}
                 />
               ))
             )}
@@ -330,7 +337,7 @@ function ResultRow({ icon, title, snippet, query, meta, onPress }) {
   );
 }
 
-function SearchResults({ query, results, navigation }) {
+function SearchResults({ query, results, navigation, onOpenGroup }) {
   const { groups, messages, files, votes, people } = results;
   const total =
     groups.length + messages.length + files.length + votes.length + people.length;
@@ -352,7 +359,7 @@ function SearchResults({ query, results, navigation }) {
         <>
           <SectionLabel style={styles.section}>Groups</SectionLabel>
           {groups.map((g) => (
-            <GroupCard key={g.id} group={g} onPress={() => toFeed(g.id, g.name)} />
+            <GroupCard key={g.id} group={g} onPress={() => onOpenGroup(g)} />
           ))}
         </>
       ) : null}

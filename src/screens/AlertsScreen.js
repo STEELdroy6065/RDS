@@ -79,7 +79,10 @@ export default function AlertsScreen({ navigation }) {
         else navigation.navigate('Votes', { groupId: n.group_id, groupName });
         break;
       case 'new_announcement':
-        navigation.navigate('Feed', { groupId: n.group_id, groupName });
+        navigation.navigate(group && group.role === 'Guardian' ? 'GuardianGroup' : 'Feed', {
+          groupId: n.group_id,
+          groupName,
+        });
         break;
       case 'attendance_missed':
         navigation.navigate('Attendance', { groupId: n.group_id, groupName });
