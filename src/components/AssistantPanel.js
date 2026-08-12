@@ -18,8 +18,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius, type } from '../theme';
 import { supabase } from '../lib/supabase';
+import { confirm } from '../lib/confirm';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
+
+// How many recent turns to resend to the AI as context (keeps cost flat even as
+// stored history grows), and how many to keep on-device.
+const CONTEXT_TURNS = 8;
+const STORE_CAP = 100;
 
 // The assistant fetches its own data via server-side query tools now, so the
 // client only sends a lightweight picture: the group list, and the per-group
@@ -72,17 +78,60 @@ export default function AssistantPanel({ visible, onClose }) {
   const [conversation, setConversation] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const scrollRef = useRef(null);
 
-  // Reset the conversation only when the panel opens — NOT when `groups`
-  // happens to refresh mid-chat (that would wipe the history we need to send
-  // for follow-ups to make sense).
+  const chatKey = user ? `assistantChat:${user.id}` : null;
+
+  // Load the stored conversation when the panel opens (persists per user until
+  // cleared). Marks `hydrated` so we don't overwrite storage with an empty
+  // array before the load finishes.
   useEffect(() => {
-    if (visible) {
-      setConversation([]);
-      setInput('');
+    if (!visible) {
+      setHydrated(false);
+      return;
     }
-  }, [visible]);
+    setInput('');
+    let active = true;
+    (async () => {
+      let stored = [];
+      if (chatKey) {
+        try {
+          const raw = await AsyncStorage.getItem(chatKey);
+          if (raw) stored = JSON.parse(raw) || [];
+        } catch {
+          stored = [];
+        }
+      }
+      if (active) {
+        setConversation(Array.isArray(stored) ? stored : []);
+        setHydrated(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [visible, chatKey]);
+
+  // Persist on every change once hydrated (capped so it can't grow unbounded).
+  useEffect(() => {
+    if (!hydrated || !chatKey) return;
+    const toStore = conversation.slice(-STORE_CAP);
+    AsyncStorage.setItem(chatKey, JSON.stringify(toStore)).catch(() => {});
+  }, [conversation, hydrated, chatKey]);
+
+  function clearHistory() {
+    confirm({
+      title: 'Clear history?',
+      message: 'This permanently deletes your assistant conversation. This can’t be undone.',
+      confirmLabel: 'Clear',
+      destructive: true,
+      onConfirm: () => {
+        setConversation([]);
+        if (chatKey) AsyncStorage.removeItem(chatKey).catch(() => {});
+      },
+    });
+  }
 
   const mostActive =
     [...groups].sort((a, b) => (b.members || 0) - (a.members || 0))[0]?.name ||
@@ -112,11 +161,13 @@ export default function AssistantPanel({ visible, onClose }) {
         role: g.role,
         members: g.members,
       }));
-      // Send the real conversation for follow-up context, minus any error
-      // placeholders (those aren't genuine assistant turns).
+      // Only resend the most recent handful of turns (minus error
+      // placeholders) — the full history stays on-device/visible, but cost
+      // stays flat as it grows.
       const history = next
         .filter((m) => !m.error)
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map((m) => ({ role: m.role, content: m.content }))
+        .slice(-CONTEXT_TURNS);
       const { data, error } = await supabase.functions.invoke('assistant', {
         body: {
           messages: history,
@@ -174,9 +225,17 @@ export default function AssistantPanel({ visible, onClose }) {
               <Ionicons name="sparkles" size={18} color={colors.primary} />
               <Text style={styles.headerTitle}>Assistant</Text>
             </View>
-            <Pressable onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={22} color={colors.muted} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              {conversation.length > 0 ? (
+                <Pressable onPress={clearHistory} hitSlop={8} style={styles.headerAction}>
+                  <Ionicons name="trash-outline" size={19} color={colors.muted} />
+                  <Text style={styles.clearText}>Clear</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={onClose} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView
@@ -297,6 +356,9 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerTitle: { ...type.heading, color: colors.ink },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  headerAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  clearText: { ...type.caption, color: colors.muted },
 
   body: { flex: 1 },
   bodyContent: { paddingVertical: spacing.lg },
