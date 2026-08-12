@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import { colors, spacing, radius, type, roleTheme } from '../../theme';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
+import { useNetwork } from '../../state/network';
 import { confirm, notify } from '../../lib/confirm';
 
 // Only offer an AI catch-up once a real backlog has built up, to keep API
@@ -67,6 +68,11 @@ export default function FeedScreen({ route, navigation }) {
   const [attachOpen, setAttachOpen] = useState(false);
   // Attachments picked but not yet sent (staged with an optional caption).
   const [pending, setPending] = useState([]);
+  // Text messages composed while offline, waiting to send.
+  const { online } = useNetwork();
+  const [queued, setQueued] = useState([]);
+  const queueKey = `queue:${groupId}`;
+  const flushingRef = useRef(false);
 
   // Chat header controls
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,6 +189,13 @@ export default function FeedScreen({ route, navigation }) {
     return messages.filter((m) => !m.deleted && (m.text || '').toLowerCase().includes(q));
   }, [messages, query]);
 
+  // Queued (offline) messages render at the bottom of the (inverted) list.
+  const listData = useMemo(() => {
+    if (query) return shown; // don't mix queued items into search results
+    const q = [...queued].reverse().map((item) => ({ ...item, __queued: true }));
+    return [...q, ...messages];
+  }, [query, shown, queued, messages]);
+
   // Messages that arrived from others since the user last opened this group.
   const unread = useMemo(() => {
     if (!sinceTime) return [];
@@ -233,10 +246,66 @@ export default function FeedScreen({ route, navigation }) {
     if (!error) setMessages(data || []);
   }, [groupId]);
 
+  // Load the offline outbox for this group.
+  useEffect(() => {
+    AsyncStorage.getItem(queueKey)
+      .then((raw) => {
+        try {
+          setQueued(raw ? JSON.parse(raw) : []);
+        } catch {
+          setQueued([]);
+        }
+      })
+      .catch(() => setQueued([]));
+  }, [queueKey]);
+
+  function saveQueue(next) {
+    setQueued(next);
+    AsyncStorage.setItem(queueKey, JSON.stringify(next)).catch(() => {});
+  }
+
+  // Send everything in the outbox, oldest first. Reads storage as the source of
+  // truth and runs at most once at a time. Triggered on reconnect and on focus.
+  const flushQueue = useCallback(async () => {
+    if (flushingRef.current) return;
+    let arr = [];
+    try {
+      const raw = await AsyncStorage.getItem(queueKey);
+      arr = raw ? JSON.parse(raw) : [];
+    } catch {
+      arr = [];
+    }
+    if (!arr.length) return;
+    flushingRef.current = true;
+    const remaining = [...arr];
+    for (const item of arr) {
+      const { error } = await supabase.from('posts').insert({
+        group_id: groupId,
+        author_id: user.id,
+        author_name: user.name,
+        type: item.announce ? 'Announcement' : 'Discussion',
+        text: item.text,
+      });
+      if (error) break; // still failing — keep the rest, retry later
+      const idx = remaining.findIndex((x) => x.id === item.id);
+      if (idx >= 0) remaining.splice(idx, 1);
+    }
+    flushingRef.current = false;
+    setQueued(remaining);
+    await AsyncStorage.setItem(queueKey, JSON.stringify(remaining)).catch(() => {});
+    load();
+  }, [queueKey, groupId, user, load]);
+
+  // Flush when connectivity returns.
+  useEffect(() => {
+    if (online) flushQueue();
+  }, [online, flushQueue]);
+
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      if (online) flushQueue();
+    }, [load, online, flushQueue])
   );
 
   function stage(items) {
@@ -281,6 +350,29 @@ export default function FeedScreen({ route, navigation }) {
   async function handleSend() {
     const body = text.trim();
     if ((!body && pending.length === 0) || sending) return;
+
+    // Offline: queue text locally (it'll send on reconnect); files still need a
+    // connection, so keep them staged and say so.
+    if (!online) {
+      if (body) {
+        saveQueue([
+          ...queued,
+          { id: mkId(0), text: body, announce: isModerator && announce, queuedAt: Date.now() },
+        ]);
+        setText('');
+        setAnnounce(false);
+      }
+      if (pending.length > 0) {
+        notify({
+          title: 'You’re offline',
+          message: 'Files send once you’re back online — they’re still attached.',
+        });
+      } else if (!body) {
+        notify({ title: 'You’re offline', message: 'Nothing to queue yet.' });
+      }
+      return;
+    }
+
     setSending(true);
     try {
       if (pending.length > 0) {
@@ -494,19 +586,23 @@ export default function FeedScreen({ route, navigation }) {
         keyboardVerticalOffset={8}
       >
         <FlatList
-          data={shown}
+          data={listData}
           inverted
           style={styles.flex}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <Bubble
-              post={item}
-              own={item.author_id === user.id}
-              onLongPress={() => setMenuPost(item)}
-            />
-          )}
+          renderItem={({ item }) =>
+            item.__queued ? (
+              <QueuedBubble item={item} />
+            ) : (
+              <Bubble
+                post={item}
+                own={item.author_id === user.id}
+                onLongPress={() => setMenuPost(item)}
+              />
+            )
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons
@@ -839,6 +935,23 @@ function AttachmentView({ post, own, onLongPress }) {
   );
 }
 
+function QueuedBubble({ item }) {
+  const t = new Date(item.queuedAt || Date.now());
+  const hh = String(t.getHours()).padStart(2, '0');
+  const mm = String(t.getMinutes()).padStart(2, '0');
+  return (
+    <View style={styles.ownRow}>
+      <View style={[styles.ownBubble, styles.queuedBubble]}>
+        <Text style={styles.ownText}>{item.text}</Text>
+        <View style={styles.queuedFoot}>
+          <Ionicons name="time-outline" size={11} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.queuedText}>queued · {hh}:{mm}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function Bubble({ post, own, onLongPress }) {
   const isAnnouncement = post.type === 'Announcement';
   const amber = roleTheme('Admin');
@@ -1064,6 +1177,11 @@ const styles = StyleSheet.create({
   },
   ownText: { ...type.body, color: colors.onPrimary, lineHeight: 20 },
   ownTime: { ...type.caption, color: colors.muted, fontSize: 10, marginLeft: 6, marginBottom: 2 },
+
+  // queued (offline) message
+  queuedBubble: { opacity: 0.9 },
+  queuedFoot: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, alignSelf: 'flex-end' },
+  queuedText: { ...type.caption, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
 
   // attachments
   mediaBubble: { padding: 3 },

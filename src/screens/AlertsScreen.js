@@ -6,7 +6,7 @@ import Screen from '../components/Screen';
 import Pulse from '../components/Pulse';
 import { useStatusBar } from '../components/useStatusBar';
 import { colors, spacing, radius, type } from '../theme';
-import { useNotifications } from '../state/notifications';
+import { useNotifications, isActionable } from '../state/notifications';
 import { useGroups } from '../state/groups';
 
 const TYPE_META = {
@@ -29,10 +29,37 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
+function Row({ n, group, last, onPress }) {
+  const meta = TYPE_META[n.type] || TYPE_META.new_announcement;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, !last && styles.rowBorder, pressed && styles.pressed]}
+    >
+      <View style={[styles.icon, { backgroundColor: meta.bg }]}>
+        <Ionicons name={meta.icon} size={18} color={meta.fg} />
+      </View>
+      <View style={styles.body}>
+        <Text style={[styles.message, !n.read && styles.messageUnread]} numberOfLines={2}>
+          {n.message}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>{group ? group.name : meta.label}</Text>
+      </View>
+      <View style={styles.right}>
+        <Text style={styles.time}>{relTime(n.created_at)}</Text>
+        {!n.read ? <Pulse color={colors.accent} size={7} /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 export default function AlertsScreen({ navigation }) {
   useStatusBar('dark');
-  const { items, loading, unreadCount, refresh, markRead, markAllRead } = useNotifications();
+  const { items, loading, needsYouUnreadCount, refresh, markRead, markAllRead } = useNotifications();
   const { getGroup } = useGroups();
+
+  const needsYou = items.filter((n) => isActionable(n.type));
+  const other = items.filter((n) => !isActionable(n.type));
 
   useFocusEffect(
     useCallback(() => {
@@ -80,7 +107,7 @@ export default function AlertsScreen({ navigation }) {
             <Text style={styles.title}>Alerts</Text>
           </View>
           <View style={styles.headRight}>
-            {unreadCount > 0 ? (
+            {needsYouUnreadCount > 0 ? (
               <Pressable onPress={markAllRead} hitSlop={8}>
                 <Text style={styles.markAll}>Mark all read</Text>
               </Pressable>
@@ -91,42 +118,40 @@ export default function AlertsScreen({ navigation }) {
         {items.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="notifications-outline" size={30} color={colors.muted} />
-            <Text style={styles.emptyText}>
-              {loading ? 'Loading…' : 'No alerts yet'}
-            </Text>
+            <Text style={styles.emptyText}>{loading ? 'Loading…' : 'No alerts yet'}</Text>
           </View>
         ) : (
-          items.map((n, i) => {
-            const meta = TYPE_META[n.type] || TYPE_META.new_announcement;
-            const group = getGroup(n.group_id);
-            return (
-              <Pressable
-                key={n.id}
-                onPress={() => open(n)}
-                style={({ pressed }) => [
-                  styles.row,
-                  i < items.length - 1 && styles.rowBorder,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <View style={[styles.icon, { backgroundColor: meta.bg }]}>
-                  <Ionicons name={meta.icon} size={18} color={meta.fg} />
-                </View>
-                <View style={styles.body}>
-                  <Text style={[styles.message, !n.read && styles.messageUnread]} numberOfLines={2}>
-                    {n.message}
-                  </Text>
-                  <Text style={styles.meta} numberOfLines={1}>
-                    {group ? group.name : meta.label}
-                  </Text>
-                </View>
-                <View style={styles.right}>
-                  <Text style={styles.time}>{relTime(n.created_at)}</Text>
-                  {!n.read ? <Pulse color={colors.accent} size={7} /> : null}
-                </View>
-              </Pressable>
-            );
-          })
+          <>
+            {needsYou.length ? (
+              <>
+                <Text style={styles.bucket}>Needs you</Text>
+                {needsYou.map((n, i) => (
+                  <Row
+                    key={n.id}
+                    n={n}
+                    group={getGroup(n.group_id)}
+                    last={i === needsYou.length - 1}
+                    onPress={() => open(n)}
+                  />
+                ))}
+              </>
+            ) : null}
+
+            {other.length ? (
+              <>
+                <Text style={[styles.bucket, needsYou.length && styles.bucketGap]}>Other</Text>
+                {other.map((n, i) => (
+                  <Row
+                    key={n.id}
+                    n={n}
+                    group={getGroup(n.group_id)}
+                    last={i === other.length - 1}
+                    onPress={() => open(n)}
+                  />
+                ))}
+              </>
+            ) : null}
+          </>
         )}
       </ScrollView>
     </Screen>
@@ -150,6 +175,8 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.ink },
   headRight: { flexDirection: 'row', alignItems: 'center' },
   markAll: { ...type.bodyStrong, fontSize: 13, color: colors.primary },
+  bucket: { ...type.label, color: colors.muted, marginBottom: spacing.sm },
+  bucketGap: { marginTop: spacing.xl },
   empty: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
   emptyText: { ...type.body, color: colors.muted },
   row: {

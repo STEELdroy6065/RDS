@@ -15,6 +15,13 @@ import { useSession } from './session';
 
 const NotificationsContext = createContext(null);
 
+// "Needs you" = has a real deadline/action attached. Only these badge the bell.
+// Everything else (announcements, joins) is informational.
+const ACTIONABLE_TYPES = new Set(['new_vote', 'attendance_missed', 'post_reported']);
+export function isActionable(type) {
+  return ACTIONABLE_TYPES.has(type);
+}
+
 export function NotificationsProvider({ children }) {
   const { user } = useSession();
   const [items, setItems] = useState([]);
@@ -57,6 +64,8 @@ export function NotificationsProvider({ children }) {
       items,
       loading,
       unreadCount: items.filter((n) => !n.read).length,
+      // Only actionable ("Needs you") unread items drive the bell badge.
+      needsYouUnreadCount: items.filter((n) => !n.read && isActionable(n.type)).length,
       refresh,
       markRead,
       markAllRead,

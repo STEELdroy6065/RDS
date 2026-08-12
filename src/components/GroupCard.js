@@ -7,7 +7,7 @@ import { colors, spacing, radius, type, shadow, roleTheme } from '../theme';
 
 // A single group row. The user's role in the group is the visual signature: a
 // colored left stripe, a role-colored ring on the avatar, and a role badge.
-export default function GroupCard({ group, onPress }) {
+export default function GroupCard({ group, onPress, status }) {
   const rc = roleTheme(group.role);
 
   return (
@@ -26,7 +26,11 @@ export default function GroupCard({ group, onPress }) {
           <View style={styles.metaRow}>
             <RoleBadge role={group.role} />
             <View style={styles.dot} />
-            <Text style={styles.meta}>{group.members} members</Text>
+            {status ? (
+              <Text style={styles.status} numberOfLines={1}>{status}</Text>
+            ) : (
+              <Text style={styles.meta}>{group.members} members</Text>
+            )}
           </View>
         </View>
 
@@ -85,5 +89,11 @@ const styles = StyleSheet.create({
   meta: {
     ...type.caption,
     color: colors.muted,
+  },
+  status: {
+    ...type.caption,
+    color: colors.ink,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 });

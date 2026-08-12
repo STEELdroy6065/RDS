@@ -1,10 +1,13 @@
 import React from 'react';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/screens/onboarding/SplashScreen';
+import OfflineBanner from './src/components/OfflineBanner';
+import { NetworkProvider } from './src/state/network';
 import { SessionProvider } from './src/state/session';
 import { GroupsProvider } from './src/state/groups';
 import { VotesProvider } from './src/state/votes';
@@ -28,17 +31,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <SessionProvider>
-        <GroupsProvider>
-          <VotesProvider>
-            <AttendanceProvider>
-              <NotificationsProvider>
-                <RootNavigator />
-              </NotificationsProvider>
-            </AttendanceProvider>
-          </VotesProvider>
-        </GroupsProvider>
-      </SessionProvider>
+      <NetworkProvider>
+        <SessionProvider>
+          <GroupsProvider>
+            <VotesProvider>
+              <AttendanceProvider>
+                <NotificationsProvider>
+                  <View style={{ flex: 1 }}>
+                    <OfflineBanner />
+                    <RootNavigator />
+                  </View>
+                </NotificationsProvider>
+              </AttendanceProvider>
+            </VotesProvider>
+          </GroupsProvider>
+        </SessionProvider>
+      </NetworkProvider>
     </SafeAreaProvider>
   );
 }
