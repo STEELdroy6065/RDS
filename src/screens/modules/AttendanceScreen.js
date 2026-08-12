@@ -194,6 +194,23 @@ export default function AttendanceScreen({ route, navigation }) {
           )}
         </Pressable>
 
+        {/* Weekly digest — moderators only */}
+        {isAdmin || isCaptain ? (
+          <Pressable
+            onPress={() => navigation.navigate('Digest', { groupId, groupName })}
+            style={({ pressed }) => [styles.leaveRow, pressed && styles.pressed]}
+          >
+            <View style={styles.leaveIcon}>
+              <Ionicons name="stats-chart-outline" size={19} color={colors.inkSoft} />
+            </View>
+            <View style={styles.leaveBody}>
+              <Text style={styles.leaveTitle}>Weekly digest</Text>
+              <Text style={styles.leaveSub}>Who needs a word this week</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          </Pressable>
+        ) : null}
+
         {/* Your record this term */}
         {myRecord && myRecord.total > 0 ? (
           <TermRecordCard

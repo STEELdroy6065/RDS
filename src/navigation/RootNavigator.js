@@ -26,6 +26,7 @@ import MarkAttendanceScreen from '../screens/modules/MarkAttendanceScreen';
 import LeaveScreen from '../screens/modules/LeaveScreen';
 import RecordScreen from '../screens/modules/RecordScreen';
 import WeekScreen from '../screens/modules/WeekScreen';
+import DigestScreen from '../screens/modules/DigestScreen';
 import GuardianGroupScreen from '../screens/modules/GuardianGroupScreen';
 import GuardiansScreen from '../screens/modules/GuardiansScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
@@ -111,6 +112,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Leave" component={LeaveScreen} />
             <Stack.Screen name="Record" component={RecordScreen} />
             <Stack.Screen name="Week" component={WeekScreen} />
+            <Stack.Screen name="Digest" component={DigestScreen} />
             <Stack.Screen name="GuardianGroup" component={GuardianGroupScreen} />
             <Stack.Screen name="Guardians" component={GuardiansScreen} />
             <Stack.Screen name="PrivacyNotice" component={PrivacyScreen} />
