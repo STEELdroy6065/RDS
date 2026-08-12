@@ -18,6 +18,7 @@ const MODULES = [
   { key: 'Votes', title: 'Votes', subtitle: 'Polls & decisions', icon: 'bar-chart-outline' },
   { key: 'Members', title: 'Members', subtitle: 'Roster & roles', icon: 'people-outline' },
   { key: 'Attendance', title: 'Attendance', subtitle: 'Roll & check-ins', icon: 'calendar-outline' },
+  { key: 'Week', title: 'Week', subtitle: 'Timetable & sessions', icon: 'time-outline' },
 ];
 
 export default function GroupDetailScreen({ route, navigation }) {
