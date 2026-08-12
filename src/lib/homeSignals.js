@@ -50,8 +50,9 @@ function pickForYou(groups, statusByGroup, items) {
       kind: 'cascade',
       tone: 'urgent',
       icon: 'alert-circle',
-      title: 'A missed check-in needs your response',
+      title: `A missed check-in in ${g.name} needs your response`,
       subtitle: g.name,
+      actionLabel: 'Review',
       target: { screen: 'Attendance', params: { groupId: g.id, groupName: g.name } },
     };
   }
@@ -67,6 +68,7 @@ function pickForYou(groups, statusByGroup, items) {
       icon: 'time',
       title: `Attendance is overdue in ${overdue.name}`,
       subtitle: `Was due at ${overdue.checkInDeadline}`,
+      actionLabel: 'Mark now',
       target: { screen: 'Attendance', params: { groupId: overdue.id, groupName: overdue.name } },
     };
   }
@@ -80,6 +82,7 @@ function pickForYou(groups, statusByGroup, items) {
       icon: 'calendar',
       title: `Mark attendance in ${due.name}`,
       subtitle: `Due by ${due.checkInDeadline}`,
+      actionLabel: 'Mark attendance',
       target: { screen: 'Attendance', params: { groupId: due.id, groupName: due.name } },
     };
   }
@@ -93,6 +96,7 @@ function pickForYou(groups, statusByGroup, items) {
       icon: 'bar-chart',
       title: `A vote is open in ${voteGroup.name}`,
       subtitle: 'Cast your vote',
+      actionLabel: 'Vote',
       target: { screen: 'Votes', params: { groupId: voteGroup.id, groupName: voteGroup.name } },
     };
   }

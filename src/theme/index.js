@@ -1,5 +1,5 @@
 import { colors, avatarPalette, colorFromString } from './colors';
-import { type } from './typography';
+import { type, monoFamily } from './typography';
 import { roleColors, roleTheme, topRole } from './roles';
 
 export const spacing = {
@@ -35,5 +35,5 @@ export const shadow = {
   },
 };
 
-export { colors, avatarPalette, colorFromString, type };
+export { colors, avatarPalette, colorFromString, type, monoFamily };
 export { roleColors, roleTheme, topRole };

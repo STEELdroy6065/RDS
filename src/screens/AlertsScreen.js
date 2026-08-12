@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.ink },
   headRight: { flexDirection: 'row', alignItems: 'center' },
   markAll: { ...type.bodyStrong, fontSize: 13, color: colors.primary },
-  bucket: { ...type.label, color: colors.muted, marginBottom: spacing.sm },
+  bucket: { ...type.monoLabel, fontSize: 11, letterSpacing: 1.2, color: colors.muted, marginBottom: spacing.sm },
   bucketGap: { marginTop: spacing.xl },
   empty: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
   emptyText: { ...type.body, color: colors.muted },

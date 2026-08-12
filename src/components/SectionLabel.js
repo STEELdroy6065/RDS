@@ -20,7 +20,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   label: {
-    ...type.label,
+    ...type.monoLabel,
+    fontSize: 11,
+    letterSpacing: 1.2,
     color: colors.muted,
   },
 });

@@ -4,22 +4,22 @@
 
 export const roleColors = {
   Admin: {
-    solid: '#15161B',
-    soft: '#F0F0F2',
-    text: '#15161B',
-    ring: '#15161B',
+    solid: '#14140F',
+    soft: '#EFEDE8',
+    text: '#14140F',
+    ring: '#14140F',
   },
   Captain: {
-    solid: '#54555E',
-    soft: '#F0F0F2',
-    text: '#33343B',
-    ring: '#54555E',
+    solid: '#57534C',
+    soft: '#EFEDE8',
+    text: '#3D3A34',
+    ring: '#57534C',
   },
   Member: {
-    solid: '#9A9BA4',
-    soft: '#F3F3F5',
-    text: '#54555E',
-    ring: '#D7D7DC',
+    solid: '#6E6A63',
+    soft: '#F2F0EC',
+    text: '#57534C',
+    ring: '#DAD5CC',
   },
 };
 

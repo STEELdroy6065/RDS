@@ -1,45 +1,44 @@
-// RDS palette — clean, professional, monochrome.
-// White canvas, near-black ink, restrained grays, black as the primary accent.
-// Color is used sparingly (red only for destructive/attention).
+// RDS palette — warm "paper" system.
+// Off-white paper canvas, near-black warm ink, restrained warm grays.
+// Red is reserved for time running out. Green means present, amber means unresolved.
 
 export const colors = {
   // Canvas & surfaces
-  bg: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F3F3F5', // inputs, chips, icon tiles
+  bg: '#FBFAF8', // warm paper
+  surface: '#FFFFFF', // cards
+  surfaceAlt: '#F2F0EC', // sunk — inputs, chips, icon tiles
 
-  // Ink / text
-  ink: '#15161B', // near-black text
-  inkSoft: '#54555E', // secondary text
-  muted: '#9A9BA4', // captions, line icons, placeholders
+  // Ink / text (warm neutrals)
+  ink: '#14140F', // near-black warm text
+  inkSoft: '#57534C', // secondary text
+  muted: '#6E6A63', // captions, line icons, placeholders
   onPrimary: '#FFFFFF',
 
-  // Brand / primary = near-black
-  primary: '#15161B',
+  // Brand / primary = near-black warm
+  primary: '#14140F',
   primaryDark: '#000000',
-  primarySoft: '#F3F3F5',
+  primarySoft: '#F2F0EC',
 
-  // Accent — reserved for destructive / attention only
-  accent: '#CF3B2E',
-  accentSoft: '#FBECE9',
+  // Accent — reserved for time running out / urgent attention
+  accent: '#D93A2B',
+  accentSoft: '#FBEAE7',
 
-  // Semantic — muted, used sparingly
-  success: '#2F7D5B',
-  successSoft: '#ECF4EF',
-  warning: '#8C6D1E',
-  warningSoft: '#F4EFDF',
+  // Semantic — present / unresolved
+  success: '#2E7D5B', // present
+  successSoft: '#E6F1EC',
+  warning: '#B5730E', // unresolved
+  warningSoft: '#FAF0DC',
   info: '#3C6CA6',
   infoSoft: '#EBF1F8',
 
   // Lines & shadow
-  border: '#E7E7EB',
-  divider: '#EFEFF2',
-  shadow: '#15161B',
+  border: '#E7E3DC', // warm hairline
+  divider: '#EFECE6',
+  shadow: '#14140F',
 };
 
-// Restrained, professional avatar tones (neutral grays) so initials read as
-// clean, not colorful.
-export const avatarPalette = ['#3F4048', '#54555E', '#6B6C75'];
+// Restrained, warm avatar tones so initials read as calm, not colorful.
+export const avatarPalette = ['#3D3A34', '#57534C', '#6E6A63'];
 
 export function colorFromString(str = '') {
   let hash = 0;

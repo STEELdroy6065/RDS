@@ -196,6 +196,13 @@ export default function FeedScreen({ route, navigation }) {
     return [...q, ...messages];
   }, [query, shown, queued, messages]);
 
+  // The most recent announcement, pinned above the feed so it doesn't scroll
+  // away inside the chat (messages are newest-first).
+  const pinned = useMemo(
+    () => messages.find((m) => m.type === 'Announcement' && !m.deleted) || null,
+    [messages]
+  );
+
   // Messages that arrived from others since the user last opened this group.
   const unread = useMemo(() => {
     if (!sinceTime) return [];
@@ -536,6 +543,30 @@ export default function FeedScreen({ route, navigation }) {
             <Ionicons name="close" size={18} color={colors.muted} />
           </Pressable>
         </View>
+      ) : null}
+
+      {/* Pinned announcement — stays put above the feed instead of scrolling away */}
+      {pinned && !searchOpen ? (
+        <Pressable
+          onPress={() =>
+            notify({
+              title: `Announcement · ${pinned.author_name || 'Group'}`,
+              message: pinned.text || '',
+            })
+          }
+          style={({ pressed }) => [styles.pinned, pressed && styles.pressed]}
+        >
+          <Ionicons name="megaphone" size={16} color={colors.warning} />
+          <View style={styles.pinnedBody}>
+            <Text style={styles.pinnedTitle} numberOfLines={1}>
+              Announcement · {pinned.author_name || 'Group'}
+            </Text>
+            <Text style={styles.pinnedText} numberOfLines={1}>
+              {pinned.text}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+        </Pressable>
       ) : null}
 
       {/* Catch me up — AI summary of what was missed (dismissible, non-blocking) */}
@@ -918,7 +949,7 @@ function AttachmentView({ post, own, onLongPress }) {
       style={styles.fileChip}
     >
       <View style={[styles.fileIcon, own ? styles.fileIconOwn : styles.fileIconOther]}>
-        <Ionicons name="document-text-outline" size={20} color={own ? colors.onPrimary : colors.inkSoft} />
+        <Ionicons name="document-text-outline" size={20} color={own ? colors.onPrimary : colors.accent} />
       </View>
       <View style={styles.fileMeta}>
         <Text
@@ -1060,6 +1091,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   searchInput: { ...type.body, flex: 1, color: colors.ink, padding: 0 },
+
+  // pinned announcement
+  pinned: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.warningSoft,
+  },
+  pinnedBody: { flex: 1 },
+  pinnedTitle: { ...type.bodyStrong, fontSize: 13, color: colors.ink },
+  pinnedText: { ...type.caption, color: colors.muted, marginTop: 1 },
 
   // catch me up
   catchButtonRow: {
@@ -1207,7 +1251,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fileIconOwn: { backgroundColor: 'rgba(255,255,255,0.18)' },
-  fileIconOther: { backgroundColor: colors.surface },
+  fileIconOther: { backgroundColor: colors.accentSoft },
   fileMeta: { flex: 1 },
   fileName: { ...type.bodyStrong, fontSize: 14 },
   fileHint: { ...type.caption, fontSize: 11, marginTop: 1 },
@@ -1235,8 +1279,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   announceHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  announceLabel: { ...type.label, fontSize: 10, marginLeft: 5, flex: 1 },
-  announceTime: { ...type.caption, color: colors.muted, fontSize: 10 },
+  announceLabel: { ...type.monoLabel, fontSize: 10, marginLeft: 5, flex: 1 },
+  announceTime: { ...type.monoSmall, color: colors.muted, fontSize: 10 },
   announceText: { ...type.body, color: colors.ink, lineHeight: 21 },
   announceAuthor: { ...type.caption, color: colors.muted, marginTop: spacing.sm },
 

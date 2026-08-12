@@ -1,45 +1,36 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { radius, spacing, type, roleTheme } from '../theme';
+import { colors, radius, spacing, type, roleTheme } from '../theme';
 
-// Role-colored pill (gold / teal / indigo) — the badge form of the app's
-// role signature. Replaces the old plain gray role pill.
+// Role chip — mono uppercase tag. Quiet by default (sunk bg, muted text);
+// `solid` fills it with the role color for emphasis. Roles read as labels,
+// not decoration.
 export default function RoleBadge({ role, style, solid = false }) {
   const rc = roleTheme(role);
   return (
     <View
       style={[
         styles.wrap,
-        solid
-          ? { backgroundColor: rc.solid }
-          : { backgroundColor: rc.soft },
+        solid ? { backgroundColor: rc.solid } : styles.wrapQuiet,
         style,
       ]}
     >
-      <View style={[styles.dot, { backgroundColor: solid ? '#FFFFFF' : rc.solid }]} />
-      <Text style={[styles.text, { color: solid ? '#FFFFFF' : rc.text }]}>{role}</Text>
+      <Text style={[styles.text, { color: solid ? '#FFFFFF' : colors.muted }]}>{role}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  wrapQuiet: {
+    backgroundColor: colors.surfaceAlt,
   },
   text: {
-    ...type.label,
-    fontSize: 10,
-    letterSpacing: 0.4,
+    ...type.monoLabel,
   },
 });

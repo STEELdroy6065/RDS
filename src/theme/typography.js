@@ -1,12 +1,18 @@
 import { Platform } from 'react-native';
 
-// Clean, professional system type. Confident but restrained weights — no
-// oversized display treatment, minimal letter-spacing tricks.
+// Type system: sans for everything spoken, mono for everything counted —
+// times, tallies, percentages, IDs. Mono uses the platform monospace so we
+// add no font dependency (a real IBM Plex Mono can be loaded later).
 const family = Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' });
 const familyMedium = Platform.select({
   ios: 'System',
   android: 'sans-serif-medium',
   default: 'System',
+});
+export const monoFamily = Platform.select({
+  ios: 'Menlo',
+  android: 'monospace',
+  default: 'monospace',
 });
 
 export const type = {
@@ -48,6 +54,26 @@ export const type = {
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+
+  // Mono — everything counted.
+  mono: {
+    fontFamily: monoFamily,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  monoSmall: {
+    fontFamily: monoFamily,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Mono uppercase chip label — role tags, kickers.
+  monoLabel: {
+    fontFamily: monoFamily,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
 };

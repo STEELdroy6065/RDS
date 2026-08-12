@@ -30,9 +30,16 @@ const HEADER_AVATAR_COLOR = '#3F4048';
 
 function greetingFor(date) {
   const h = date.getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return 'Morning';
+  if (h < 18) return 'Afternoon';
+  return 'Evening';
+}
+
+// "TUE 12 AUGUST" — mono kicker above the greeting.
+function fmtDayLine(date) {
+  return date
+    .toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long' })
+    .toUpperCase();
 }
 
 function relTime(iso) {
@@ -57,16 +64,17 @@ export default function HomeScreen({ navigation }) {
 
   const firstName = user && user.name ? user.name.split(' ')[0] : 'there';
 
-  // Keep the greeting current: refresh when Home is focused and tick each
-  // minute while it's open, so it flips as the time of day changes.
-  const [greeting, setGreeting] = useState(() => greetingFor(new Date()));
+  // Keep the greeting + date line current: refresh when Home is focused and
+  // tick each minute while it's open, so they flip as the day/time changes.
+  const [now, setNow] = useState(() => new Date());
   useFocusEffect(
     useCallback(() => {
-      setGreeting(greetingFor(new Date()));
-      const id = setInterval(() => setGreeting(greetingFor(new Date())), 60 * 1000);
+      setNow(new Date());
+      const id = setInterval(() => setNow(new Date()), 60 * 1000);
       return () => clearInterval(id);
     }, [])
   );
+  const greeting = greetingFor(now);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -151,14 +159,20 @@ export default function HomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* For you — the single most time-sensitive thing right now */}
+        {/* Date + greeting */}
+        {!searching ? (
+          <>
+            <Text style={styles.dayLine}>{fmtDayLine(now)}</Text>
+            <Text style={styles.greeting}>
+              {greeting}, {firstName}
+            </Text>
+          </>
+        ) : null}
+
+        {/* Needs you now — the single most time-sensitive thing right now */}
         {!searching && forYou ? (
           <ForYouCard item={forYou} navigation={navigation} />
         ) : null}
-
-        {/* Greeting — centered */}
-        <Text style={styles.greeting}>{greeting},</Text>
-        <Text style={styles.name}>{firstName}</Text>
 
         {/* Search */}
         <View style={styles.search}>
@@ -228,24 +242,33 @@ export default function HomeScreen({ navigation }) {
 
 function ForYouCard({ item, navigation }) {
   const urgent = item.tone === 'urgent';
+  const go = () => navigation.navigate(item.target.screen, item.target.params);
   return (
     <Pressable
-      onPress={() => navigation.navigate(item.target.screen, item.target.params)}
+      onPress={go}
       style={({ pressed }) => [
         styles.forYou,
-        urgent && styles.forYouUrgent,
+        urgent ? styles.forYouUrgent : styles.forYouDue,
         pressed && styles.pressed,
       ]}
     >
-      <View style={[styles.forYouIcon, urgent && styles.forYouIconUrgent]}>
-        <Ionicons name={item.icon} size={20} color={urgent ? colors.onPrimary : colors.onPrimary} />
+      <View style={styles.forYouKicker}>
+        <View style={styles.forYouDot} />
+        <Text style={styles.forYouLabel}>
+          {urgent ? 'Needs you now' : 'For you'}
+        </Text>
       </View>
-      <View style={styles.forYouBody}>
-        <Text style={styles.forYouLabel}>FOR YOU</Text>
-        <Text style={styles.forYouTitle} numberOfLines={2}>{item.title}</Text>
-        {item.subtitle ? <Text style={styles.forYouSub} numberOfLines={1}>{item.subtitle}</Text> : null}
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+      <Text style={styles.forYouTitle}>{item.title}</Text>
+      {item.actionLabel ? (
+        <View style={styles.forYouActions}>
+          <View style={styles.forYouBtn}>
+            <Text style={styles.forYouBtnText}>{item.actionLabel}</Text>
+          </View>
+          {item.subtitle ? (
+            <Text style={styles.forYouSub} numberOfLines={1}>{item.subtitle}</Text>
+          ) : null}
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -436,42 +459,53 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   forYou: {
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  forYouUrgent: { backgroundColor: colors.accent },
+  forYouDue: { backgroundColor: colors.warning },
+  forYouKicker: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  forYouDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
+  forYouLabel: {
+    ...type.monoLabel,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    letterSpacing: 1,
+  },
+  forYouTitle: {
+    ...type.title,
+    fontSize: 20,
+    lineHeight: 26,
+    color: '#FFFFFF',
+    marginTop: spacing.md,
+  },
+  forYouActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
     gap: spacing.md,
+    marginTop: spacing.lg,
   },
-  forYouUrgent: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  forYouIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  forYouBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.xl,
   },
-  forYouIconUrgent: { backgroundColor: colors.accent },
-  forYouBody: { flex: 1 },
-  forYouLabel: { ...type.label, fontSize: 10, color: colors.muted, marginBottom: 2 },
-  forYouTitle: { ...type.bodyStrong, color: colors.ink },
-  forYouSub: { ...type.caption, color: colors.muted, marginTop: 2 },
+  forYouBtnText: { ...type.bodyStrong, color: colors.ink },
+  forYouSub: { ...type.caption, color: '#FFFFFF', opacity: 0.85, flexShrink: 1 },
+  dayLine: {
+    ...type.monoLabel,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    color: colors.muted,
+  },
   greeting: {
-    ...type.title,
-    color: colors.inkSoft,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  name: {
     ...type.display,
     fontSize: 30,
     color: colors.ink,
-    textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    marginBottom: spacing.lg,
   },
   search: {
     flexDirection: 'row',
