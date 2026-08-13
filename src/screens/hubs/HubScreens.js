@@ -1,15 +1,20 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Avatar from '../../components/Avatar';
+import AssistantPanel from '../../components/AssistantPanel';
+import SearchResults from '../../components/SearchResults';
 import { useStatusBar } from '../../components/useStatusBar';
 import { colors, spacing, radius, type, monoFamily } from '../../theme';
 import { useSession } from '../../state/session';
 import { useGroups } from '../../state/groups';
 import { useHomeSignals } from '../../lib/homeSignals';
+import { searchAll } from '../../lib/search';
 import { fetchLastMessages, fetchRecordsForGroups, aggregateRecords } from '../../lib/hubs';
+
+const EMPTY_RESULTS = { groups: [], messages: [], files: [], votes: [], people: [] };
 
 const STATUS_COLOR = { P: colors.success, L: colors.warning, A: colors.accent, E: colors.inkSoft };
 
@@ -48,10 +53,18 @@ function EmptyGroups({ text }) {
 
 export function ChatHubScreen({ navigation }) {
   useStatusBar('dark');
+  const { user } = useSession();
   const { groups } = useGroups();
   const { statusByGroup } = useHomeSignals(groups);
   const [last, setLast] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Search + AI assistant (moved here from Home).
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState(EMPTY_RESULTS);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const q = query.trim();
+  const searching = q.length > 0;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +73,23 @@ export function ChatHubScreen({ navigation }) {
   }, [groups]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Debounced cross-entity search, scoped by RLS to the user's groups.
+  useEffect(() => {
+    if (!q) {
+      setResults(EMPTY_RESULTS);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const r = await searchAll(q, { groups, user });
+      if (!cancelled) setResults(r);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q, groups, user]);
 
   // Order by most recent message; groups with none fall to the bottom.
   const ordered = useMemo(() => {
@@ -87,10 +117,36 @@ export function ChatHubScreen({ navigation }) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
       >
         <Kicker kicker="CHATS" title="Messages" />
-        {groups.length === 0 ? (
+
+        {/* Search + AI */}
+        <View style={styles.search}>
+          <Ionicons name="search" size={18} color={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search groups, messages, files..."
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.muted} />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => setAssistantOpen(true)} hitSlop={8} style={styles.aiBtn}>
+            <Ionicons name="sparkles" size={18} color={colors.onPrimary} />
+          </Pressable>
+        </View>
+
+        {searching ? (
+          <SearchResults query={q} results={results} navigation={navigation} onOpenGroup={open} />
+        ) : groups.length === 0 ? (
           <EmptyGroups text="Join a group to start chatting." />
         ) : (
           ordered.map((g) => {
@@ -120,6 +176,8 @@ export function ChatHubScreen({ navigation }) {
           })
         )}
       </ScrollView>
+
+      <AssistantPanel visible={assistantOpen} onClose={() => setAssistantOpen(false)} />
     </Screen>
   );
 }
@@ -306,6 +364,27 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm },
   emptyText: { ...type.body, color: colors.muted, textAlign: 'center' },
 
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  searchInput: { ...type.body, flex: 1, color: colors.ink, padding: 0 },
+  aiBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -17,8 +17,9 @@ import { colors, spacing, radius, type, shadow } from '../theme';
 import { useGroups } from '../state/groups';
 import { groupTemplates } from '../data/discoverable';
 
-export default function NewGroupScreen({ navigation }) {
-  const [tab, setTab] = useState('create'); // 'create' | 'join'
+export default function NewGroupScreen({ navigation, route }) {
+  const params = route && route.params ? route.params : {};
+  const [tab, setTab] = useState(params.initialTab === 'join' ? 'join' : 'create');
 
   // Replace this screen so Back returns to the Groups list, not the form.
   const openGroup = (groupId) => navigation.replace('GroupDetail', { groupId });
@@ -33,7 +34,7 @@ export default function NewGroupScreen({ navigation }) {
       </View>
 
       {tab === 'create' ? (
-        <CreateTab onCreated={openGroup} />
+        <CreateTab onCreated={openGroup} initialTemplateId={params.templateId} />
       ) : (
         <JoinTab onJoined={openGroup} onScan={() => navigation.navigate('ScanGroup')} />
       )}
@@ -51,10 +52,12 @@ function Segment({ label, active, onPress }) {
 
 // --- Create -------------------------------------------------------------
 
-function CreateTab({ onCreated }) {
+function CreateTab({ onCreated, initialTemplateId }) {
   const { createGroup } = useGroups();
   const [name, setName] = useState('');
-  const [templateId, setTemplateId] = useState('class');
+  const [templateId, setTemplateId] = useState(
+    groupTemplates.some((t) => t.id === initialTemplateId) ? initialTemplateId : 'class'
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 

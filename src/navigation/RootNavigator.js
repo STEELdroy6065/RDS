@@ -32,7 +32,8 @@ import GuardiansScreen from '../screens/modules/GuardiansScreen';
 import ReportedPostsScreen from '../screens/modules/ReportedPostsScreen';
 import MediaLinksScreen from '../screens/modules/MediaLinksScreen';
 import GroupPermissionsScreen from '../screens/modules/GroupPermissionsScreen';
-import { AttendHubScreen, ChatHubScreen, RecordHubScreen } from '../screens/hubs/HubScreens';
+import { ChatHubScreen } from '../screens/hubs/HubScreens';
+import ExploreScreen from '../screens/ExploreScreen';
 import BottomTabBar from '../components/BottomTabBar';
 
 import { colors } from '../theme';
@@ -53,9 +54,8 @@ const navTheme = {
   },
 };
 
-// The primary shell is a bottom tab bar — Home · Attend · Chat · Record — as in
-// the redesign. Alerts (bell) and Profile (avatar menu) are pushed over the tabs
-// from the outer stack.
+// The primary shell is a bottom tab bar — Home · Chat · Explore. Alerts (bell)
+// and Profile (avatar menu) are pushed over the tabs from the outer stack.
 function MainShell() {
   return (
     <Tabs.Navigator
@@ -63,9 +63,8 @@ function MainShell() {
       tabBar={(props) => <BottomTabBar {...props} />}
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
-      <Tabs.Screen name="Attend" component={AttendHubScreen} />
       <Tabs.Screen name="Chat" component={ChatHubScreen} />
-      <Tabs.Screen name="Record" component={RecordHubScreen} />
+      <Tabs.Screen name="Explore" component={ExploreScreen} />
     </Tabs.Navigator>
   );
 }

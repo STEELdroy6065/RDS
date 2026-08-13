@@ -4,13 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, type } from '../theme';
 
-// Icon + label per tab route. Order follows the mockup: Home · Attend · Chat ·
-// Record. Active state fills the icon and inks the label; inactive stays muted.
+// Icon + label per tab route. Active state fills the icon and inks the label;
+// inactive stays muted.
 const TABS = {
   Home: { on: 'home', off: 'home-outline', label: 'Home' },
-  Attend: { on: 'calendar', off: 'calendar-outline', label: 'Attend' },
   Chat: { on: 'chatbubble', off: 'chatbubble-outline', label: 'Chat' },
-  Record: { on: 'document-text', off: 'document-text-outline', label: 'Record' },
+  Explore: { on: 'compass', off: 'compass-outline', label: 'Explore' },
 };
 
 export default function BottomTabBar({ state, navigation }) {
