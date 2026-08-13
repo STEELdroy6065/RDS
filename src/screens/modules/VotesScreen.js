@@ -136,15 +136,23 @@ function VoteListCard({ vote, userId, onPress }) {
   return (
     <Card onPress={onPress} style={styles.voteCard}>
       <View style={styles.voteTop}>
-        <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-          {label === 'Live' ? (
-            <Pulse color={tone.fg} size={7} />
-          ) : (
-            <Ionicons name={tone.icon} size={11} color={tone.fg} />
-          )}
-          <Text style={[styles.statusText, { color: tone.fg }]}>
-            {label.toUpperCase()}
-          </Text>
+        <View style={styles.voteTopLeft}>
+          <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+            {label === 'Live' ? (
+              <Pulse color={tone.fg} size={7} />
+            ) : (
+              <Ionicons name={tone.icon} size={11} color={tone.fg} />
+            )}
+            <Text style={[styles.statusText, { color: tone.fg }]}>
+              {label.toUpperCase()}
+            </Text>
+          </View>
+          {vote.kind === 'captain_election' ? (
+            <View style={styles.electionTag}>
+              <Ionicons name="ribbon" size={11} color={colors.inkSoft} />
+              <Text style={styles.electionTagText}>ELECTION</Text>
+            </View>
+          ) : null}
         </View>
         {myChoice ? (
           <View style={styles.votedTag}>
@@ -232,6 +240,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
+  voteTopLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,6 +248,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
+  electionTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+  },
+  electionTagText: { ...type.monoLabel, fontSize: 9, color: colors.inkSoft },
   statusText: {
     ...type.label,
     fontSize: 10,

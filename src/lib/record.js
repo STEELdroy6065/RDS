@@ -73,6 +73,21 @@ async function votesCast(groupId, studentId) {
   }
 }
 
+// How many Captain terms this student has held in the group (from the
+// captain_terms history written when an election is closed).
+async function captainTerms(groupId, studentId) {
+  try {
+    const { count } = await supabase
+      .from('captain_terms')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .eq('user_id', studentId);
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function fetchVerification(groupId, studentId) {
   try {
     const { data } = await supabase
@@ -90,12 +105,13 @@ export async function fetchVerification(groupId, studentId) {
 
 // Assemble the full record. `self` enables the votes tile (own record only).
 export async function buildRecord(groupId, studentId, { self = false } = {}) {
-  const [att, verification, votes] = await Promise.all([
+  const [att, verification, votes, terms] = await Promise.all([
     attendanceSeries(groupId, studentId),
     fetchVerification(groupId, studentId),
     self ? votesCast(groupId, studentId) : Promise.resolve(null),
+    captainTerms(groupId, studentId),
   ]);
-  return { ...att, votes, verification };
+  return { ...att, votes, captainTerms: terms, verification };
 }
 
 export async function verifyRecord({ groupId, studentId, name, note }) {

@@ -136,9 +136,12 @@ export default function RecordScreen({ route, navigation }) {
               {self ? (
                 <StatTile value={r.votes == null ? '—' : r.votes} label="votes cast" />
               ) : (
-                <StatTile value={r.tally.P + r.tally.L} label="days present" />
+                <StatTile value={r.tally.A} label="absences" />
               )}
-              <StatTile value={r.tally.A} label="absences" />
+              <StatTile
+                value={r.captainTerms || 0}
+                label={`term${(r.captainTerms || 0) === 1 ? '' : 's'} as Captain`}
+              />
             </View>
 
             {/* Verification */}
