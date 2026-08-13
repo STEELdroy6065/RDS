@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Screen from '../components/Screen';
 import Avatar from '../components/Avatar';
@@ -8,6 +9,7 @@ import { useStatusBar } from '../components/useStatusBar';
 import { colors, spacing, radius, type, topRole } from '../theme';
 import { useSession } from '../state/session';
 import { useGroups } from '../state/groups';
+import { fetchRecordsForGroups, aggregateRecords } from '../lib/hubs';
 import { confirm } from '../lib/confirm';
 
 // Grouped settings — clean single-color line icons, ride-app style.
@@ -44,6 +46,24 @@ export default function ProfileScreen({ navigation }) {
   const name = user ? user.name : 'Member';
   const email = user ? user.email : '';
   const myTopRole = groups.length ? topRole(groups.map((g) => g.role)) : 'Member';
+
+  // Aggregate attendance across the user's groups (for the stats strip).
+  const [agg, setAgg] = useState(null);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (user && groups.length) {
+        fetchRecordsForGroups(groups, user.id).then((recs) => {
+          if (active) setAgg(aggregateRecords(recs));
+        });
+      } else {
+        setAgg(null);
+      }
+      return () => {
+        active = false;
+      };
+    }, [user, groups])
+  );
 
   function confirmSignOut() {
     confirm({
@@ -88,9 +108,9 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.stats}>
           <Stat value={groups.length} label="Groups" />
           <View style={styles.vDivider} />
-          <Stat value={0} label="Votes cast" />
+          <Stat value={agg ? agg.sessions : '—'} label="Sessions" />
           <View style={styles.vDivider} />
-          <Stat value="—" label="Attendance" />
+          <Stat value={agg && agg.rate != null ? `${agg.rate}%` : '—'} label="Attendance" />
         </View>
 
         {/* Settings — plain rows, gray line icons */}
